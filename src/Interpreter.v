@@ -23,6 +23,15 @@ Notation "'LETOPT' x <== e1 'IN' e2"
 (right associativity, at level 60).
 *)
 
+(* LETINTRES -> Let interpreter result. Aux notation for ceval_step *)
+Notation "'LETINTRES' (st, cont) <== e1 'IN' e2"
+  := (match e1 with
+        | Success (st, cont) => e2
+        | OutOfGas => OutOfGas
+        | Fail => Fail
+        end)
+  (right associativity, at level 60).
+
 (**
   2.1. TODO: Implement ceval_step as specified. To improve readability,
              you are strongly encouraged to define auxiliary notation.
@@ -40,17 +49,19 @@ Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i
       let st' := X !-> (aeval st a) ; st in (* update current state st with the new value of X *)
       Success (st', continuation) 
     | <{ c1 ; c2 }> => (* TODO -> first we should ceval c1 and then ceval c2. maybe use let st' := ... in ceval c2? *)
+      LETINTRES (st', cont') <== ceval_step st c1 continuation i' IN
+        ceval_step st' c2 cont' i'
     | <{ if b then c1 else c2 end }> =>
       if beval st b then
         ceval_step st c1 continuation i'
       else
         ceval_step st c2 continuation i'
-    | <{ while b do c end }> =>
+    | <{ while b do c1 end }> =>
       if beval st b then
-        (* maybe should eval first c and then call ceval with "while b do c" so it re-evalues the condition *)
-        ceval_step st c ((st, c)::continuation) i'
+        LETINTRES (st', continutation') <== ceval_step st c1 continuation i' IN
+          ceval_step st' c continuation' i'
       else
-        Success (st, continuation)
+        Success(st, continuation)
     | <{ c1 !! c2 } => ceval_step st c1 ((st, c2)::continuation) i' 
     | <{ a -> b }> => 
       if (beval st a) then 
