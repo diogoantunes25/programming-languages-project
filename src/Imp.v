@@ -174,7 +174,7 @@ Inductive com : Type :=
   | CIf (b : bexp) (c1 c2 : com)
   | CWhile (b : bexp) (c : com)
   | CNonDeterChoice (c1 c2 : com)
-  | CCondGuard (b: bexp) (c: com).
+  | CCondGuard (b : bexp) (c : com).
 
 (** As for expressions, we can use a few [Notation] declarations to
     make reading and writing Imp programs more convenient. *)
@@ -201,7 +201,7 @@ Notation "'while' x 'do' y 'end'" :=
             (in custom com at level 89, x at level 99, y at level 99) : com_scope.
 Notation "x '!!' y" :=
           (CNonDeterChoice x y)
-            (in custom com at level 89, left associativity) : com_scope.
+            (in custom com at level 89, right associativity) : com_scope.
 Notation "x '->' y" :=
           (CCondGuard x y)
             (in custom com at level 89, no associativity) : com_scope.

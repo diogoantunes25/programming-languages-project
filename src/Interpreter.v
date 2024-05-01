@@ -23,54 +23,61 @@ Notation "'LETOPT' x <== e1 'IN' e2"
 (right associativity, at level 60).
 *)
 
-(* LETINTRES -> Let interpreter result. Aux notation for ceval_step *)
-Notation "'LETINTRES' (st, cont) <== e1 'IN' e2"
-  := (match e1 with
-        | Success (st, cont) => e2
-        | OutOfGas => OutOfGas
-        | Fail => Fail
-        end)
-  (right associativity, at level 60).
-
 (**
   2.1. TODO: Implement ceval_step as specified. To improve readability,
              you are strongly encouraged to define auxiliary notation.
              See the notation LETOPT in the ImpCEval chapter.
 *)
 
-Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i : nat)
-                    : interpreter_result :=
+(* LETINTRES -> Let interpreter result. Aux notation for ceval_step *)
+Notation "'LETINTRES' ( st , cont ) <== e1 'IN' e2"
+  := (match e1 with
+        | Success (st, cont) => e2
+        | Fail => Fail
+        | OutOfGas => OutOfGas
+        end)
+(right associativity, at level 60).
+
+Fixpoint ceval_step (st : state) (c : com) (continuation : list (state * com)) (i : nat)
+                        : interpreter_result :=
   match i with
-  | 0 => OutOfGas
+  | O => OutOfGas
   | S i' =>
     match c with
     | <{ skip }> => Success (st, continuation)
-    | <{ X := a }> => 
-      let st' := X !-> (aeval st a) ; st in (* update current state st with the new value of X *)
-      Success (st', continuation) 
-    | <{ c1 ; c2 }> => (* TODO -> first we should ceval c1 and then ceval c2. maybe use let st' := ... in ceval c2? *)
+    | <{ x := a }> =>
+      let st' := x !-> (aeval st a) ; st in
+      Success (st', continuation)
+    | <{ (c1 !! c2) ; c3 }> => (* ; is right-associative *)
+      LETINTRES (st', cont') <== ceval_step st c1 continuation i' IN
+        ceval_step st' c3 ((st, <{ c2 ; c3 }>)::cont') i'
+    | <{ c1 ; c2 }> =>
       LETINTRES (st', cont') <== ceval_step st c1 continuation i' IN
         ceval_step st' c2 cont' i'
+    | <{ (c1 !! c2) }> =>
+      ceval_step st c1 ((st, c2)::continuation) i'
     | <{ if b then c1 else c2 end }> =>
-      if beval st b then
+      if (beval st b) then
         ceval_step st c1 continuation i'
       else
         ceval_step st c2 continuation i'
-    | <{ while b do c1 end }> =>
+    | <{ while b do c end }> =>
       if beval st b then
-        LETINTRES (st', continutation') <== ceval_step st c1 continuation i' IN
-          ceval_step st' c continuation' i'
+        LETINTRES (st', cont') <== ceval_step st c continuation i' IN
+          ceval_step st' <{while b do c end}> cont' i'
       else
-        Success(st, continuation)
-    | <{ c1 !! c2 } => ceval_step st c1 ((st, c2)::continuation) i' 
-    | <{ a -> b }> => 
-      if (beval st a) then 
-        ceval_step st b continuation i' 
-      else (* backtrack *)
+        Success (st, continuation)
+    | <{ b -> c }> =>
+      if (beval st b) then
+        ceval_step st c continuation i'
+      else
+        (* backtrack *)
         match continuation with
         | [] => Fail
-        | (st', c')::cont' => ceval_step st' c' cont' i'
-        end 
+        | (st', c') :: continuation' =>
+          ceval_step st' c' continuation' i'
+        end
+    end
   end.
 
 
@@ -147,12 +154,14 @@ Proof. auto. Qed.
   2.2. TODO: Prove p1_equals_p2. Recall that p1 and p2 are defined in Imp.v
 *)
 
+(* The interpreter result of p1 and p2 is the same, i.e, it returns for both cases Success({X = 2}, []), if and only if in the 
+non-deterministic operator (c1 !! c2) we first choose c1 *)
+
 Theorem p1_equals_p2: forall st cont,
   (exists i0,
     (forall i1, i1 >= i0 -> ceval_step st p1 cont i1 =  ceval_step st p2 cont i1)).
 Proof.
-  (* TODO *)
-Qed.
+  Admitted.
 
 
 (**
@@ -164,5 +173,4 @@ Theorem ceval_step_more: forall i1 i2 st st' c cont cont',
   ceval_step st c cont i1 = Success (st', cont') ->
   ceval_step st c cont i2 = Success (st', cont').
 Proof.
-  (* TODO *)
-Qed.
+  Admitted.

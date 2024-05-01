@@ -54,7 +54,7 @@ end
 ]=> (Z !-> 4 ; X !-> 2) / [] / Success.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
 
 
 Example ceval_example_guard1:
@@ -64,7 +64,7 @@ empty_st / [] =[
 ]=> (empty_st) / [] / Fail.
 Proof.
   (* TODO *)
-Qed. 
+  Admitted.
 
 Example ceval_example_guard2:
 empty_st / [] =[
@@ -73,7 +73,7 @@ empty_st / [] =[
 ]=> (X !-> 3 ; X !-> 2) / [] / Success.
 Proof.
   (* TODO *)
-Qed. 
+  Admitted.
 
 Example ceval_example_guard3: exists q,
 empty_st / [] =[
@@ -82,7 +82,7 @@ empty_st / [] =[
 ]=> (X !-> 3) / q / Success.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
     
 Example ceval_example_guard4: exists q,
 empty_st / [] =[
@@ -91,7 +91,7 @@ empty_st / [] =[
 ]=> (X !-> 3) / q / Success.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
 
 
 
@@ -118,44 +118,44 @@ Lemma cequiv_ex1:
 <{ X := 2 }>.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
 
 Lemma cequiv_ex2:
 <{ (X := 1 !! X := 2); X = 2 -> skip }> == 
 <{ X := 2 }>.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
 
 
 Lemma choice_idempotent: forall c,
 <{ c !! c }> == <{ c }>.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
 
 Lemma choice_comm: forall c1 c2,
 <{ c1 !! c2 }> == <{ c2 !! c1 }>.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
 
 Lemma choice_assoc: forall c1 c2 c3,
 <{ (c1 !! c2) !! c3 }> == <{ c1 !! (c2 !! c3) }>.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
 
 
 Lemma choice_seq_distr_l: forall c1 c2 c3,
 <{ c1 ; (c2 !! c3)}> == <{ (c1;c2) !! (c1;c3) }>.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
 
 Lemma choice_congruence: forall c1 c1' c2 c2',
 c1 == c1' -> c2 == c2' ->
 <{ c1 !! c2 }> == <{ c1' !! c2' }>.
 Proof.
   (* TODO *)
-Qed.
+  Admitted.
