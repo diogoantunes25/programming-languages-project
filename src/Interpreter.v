@@ -154,14 +154,23 @@ Proof. auto. Qed.
   2.2. TODO: Prove p1_equals_p2. Recall that p1 and p2 are defined in Imp.v
 *)
 
-(* The interpreter result of p1 and p2 is the same, i.e, it returns for both cases Success({X = 2}, []), if and only if in the 
+(* The interpreter result of p1 and p2 is the same, i.e, it returns for both cases Success (X !-> 2; st, cont), if and only if in the 
 non-deterministic operator (c1 !! c2) we first choose c1 *)
 
 Theorem p1_equals_p2: forall st cont,
   (exists i0,
     (forall i1, i1 >= i0 -> ceval_step st p1 cont i1 =  ceval_step st p2 cont i1)).
 Proof.
-  Admitted.
+  exists 5. (* p1 takes 5 to execute *)
+  intros.
+  destruct i1. try lia.
+  destruct i1. try lia.
+  destruct i1. try lia.
+  destruct i1. try lia.
+  destruct i1. try lia.
+  simpl.
+  reflexivity.
+Qed.
 
 
 (**
