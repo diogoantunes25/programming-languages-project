@@ -5,13 +5,13 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./simp
+        working-directory: ./src
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
       - uses: coq-community/docker-coq-action@v1
         with:
-          coq_version: 8.1
-          ocaml_version: 4.1
+          coq_version: "latest"
+          ocaml_version: "default"
       - name: Compile
-        run: cd src && make
+        run: make
