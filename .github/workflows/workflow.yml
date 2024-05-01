@@ -1,0 +1,17 @@
+name: Compile and Test
+on: [push]
+jobs:
+  Explore-GitHub-Actions:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./simp
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - uses: coq-community/docker-coq-action@v1
+        with:
+          coq_version: 8.1
+          ocaml_version: 4.1
+      - name: Compile
+        run: cd src && make
