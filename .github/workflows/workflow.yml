@@ -13,5 +13,9 @@ jobs:
         with:
           coq_version: "latest"
           ocaml_version: "default"
-      - name: Compile
-        run: make
+          script: |
+            startGroup "Build project"
+              ls
+              cd src
+              make
+            endGroupmake
