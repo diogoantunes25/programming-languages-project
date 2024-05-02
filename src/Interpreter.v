@@ -176,10 +176,47 @@ Qed.
 (**
   2.3. TODO: Prove ceval_step_more.
 *)
+(* For all i1 and i2 such that the interpreter result of ceval_step st c cont i1 is Success(st', cont) and i1 <= i2, then the interpreter result 
+of ceval_step st c cont i2 is also Success(st', cont). *)
 
 Theorem ceval_step_more: forall i1 i2 st st' c cont cont',
   i1 <= i2 ->
   ceval_step st c cont i1 = Success (st', cont') ->
   ceval_step st c cont i2 = Success (st', cont').
 Proof.
-  Admitted.
+  induction i1 as [|i1']; intros i2 st st' c cont cont' Hle Hceval.
+  - simpl in Hceval. discriminate Hceval.
+  - destruct i2 as [|i2']. inversion Hle.
+    assert ( Hle' : i1' <= i2' ) by lia.
+    destruct c.
+    all: simpl in Hceval. 
+    all: simpl.
+    (* skip *)
+    + assumption.  (* goal already in context *)
+    (* x := a *)
+    + assumption.  (* goal already in context *) 
+    (* c1 ; c2 *)
+    + destruct c1.
+      all: destruct ceval_step eqn:Hqest1'o; try discriminate Hceval.
+      all: destruct s.
+      all: apply (IHi1' i2') in Hqest1'o; try assumption.
+      all: rewrite Hqest1'o.
+      all: apply (IHi1' i2') in Hceval; assumption.
+    (* if b then c1 else c2 end *)
+    + destruct (beval st b); apply IHi1'; assumption.
+    (* while b do c1 end *)
+    + destruct (beval st b).
+      destruct ceval_step eqn:Hqest1'o; try discriminate Hceval.
+      destruct s.
+      apply (IHi1' i2') in Hqest1'o; try assumption.
+      rewrite Hqest1'o.
+      apply (IHi1' i2') in Hceval.
+      all: assumption.
+    (* c1 !! c2 *)
+    + apply (IHi1' i2') in Hceval; assumption.
+    (* b -> c *)
+    + destruct (beval st b). try intuition.
+      destruct cont. try discriminate.
+      destruct p.
+      apply (IHi1' i2') in Hceval; assumption.
+Qed.
