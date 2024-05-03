@@ -32,11 +32,54 @@ Notation "'LETOPT' x <== e1 'IN' e2"
 Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i : nat)
                     : interpreter_result :=
   match i with
-  | (* TODO *)
-  | (* TODO *)
+  | O => OutOfGas
+  | S i' => match c with
+    | <{ skip }> => Success (st, continuation)
+    | <{ x := y }> => Success ((x !-> aeval st y; st), continuation)
+    (* c2's most recent continuation will be c1's extended with c1 itself *)
+    | <{ c1 ; c2 }> =>
+      match (ceval_step st c1 continuation i') with
+      | Success (st', cont') =>
+          let new_continuation := 
+            match cont' with
+            | [] => []
+            | (st'', c') :: t => ((st'', <{ c' ; c2 }>) :: t)
+            end
+          in
+          ceval_step st' c2 new_continuation i'
+      | Fail => Fail
+      | OutOfGas => OutOfGas
+      end
+    | <{ if b then c1 else c2 end }> =>
+      if (beval st b)
+      then ceval_step st c1 continuation i'
+      else ceval_step st c2 continuation i'
+    | <{ while b do c1 end }> =>
+      if (beval st b)
+      then match (ceval_step st c continuation i') with
+           | Success(st', c') => ceval_step st' c c' i'
+           | Fail => Fail
+           | OutOfGas => OutOfGas
+           end
+      else Success (st,continuation)
+    | <{ c1 !! c2 }> =>
+      (* c1 is executed first *)
+      match (ceval_step st c1 continuation i') with
+      | Success (st', c') => Success (st', (st, c2) :: continuation)
+      | Fail => Fail
+      | OutOfGas => OutOfGas
+      end
+    | <{ b -> c1 }> =>
+      if beval st b
+      then ceval_step st c1 continuation i'
+      else
+        match continuation with
+        | [] => Fail   
+        (* FIXME: I think this is wrong - i don't have a way to resume *)
+        | (st', c') :: continuation' => ceval_step st' c' continuation' i' 
+        end
+    end
   end.
-
-
 
 (* Helper functions that help with running the interpreter *)
 Inductive show_result : Type :=
@@ -53,6 +96,85 @@ Definition run_interpreter (st: state) (c:com) (n:nat) :=
   end.
 
 (* Tests are provided to ensure that your interpreter is working for these examples *)
+
+Example test_dsa_1:
+  run_interpreter (X !-> 5) <{ X=5 -> X:=10 }> 5 = OK [("X", 10); ("Y", 0); ("Z", 0)].
+Proof. auto. Qed.
+
+Example test_dsa_2:
+  run_interpreter (X !-> 5) <{ X=5 -> X:=10 }> 5 = OK [("X", 10); ("Y", 0); ("Z", 0)].
+Proof. auto. Qed.
+
+Example test_dsa_3:
+  run_interpreter (X !-> 5) <{ X=10 -> X:=11 }> 5 = KO.
+Proof. auto. Qed.
+
+(* Example test_dsa_4: *)
+(* Compute *)
+(*   run_interpreter (X !-> 5) <{ *)
+(*     if true then (X := 1 !! X := 2) else skip end; *)
+(*     Y := X + 1; *)
+(*     X = 2 -> Z := 5; *)
+(*     X := 3  *)
+(*   }> 20. *)
+ 
+Compute
+  run_interpreter (X !-> 0) <{
+    (X := 1 !! X := 2);
+    Y := X + 1;
+    X = 2 -> Z := 3
+  }> 20.
+
+Compute
+  run_interpreter (X !-> 0) <{
+    if true then (X := 1 !! X := 2) else skip end;
+    Y := X + 1;
+    X = 2 -> Z := 3
+  }> 20.
+
+Compute
+  run_interpreter (X !-> 0) <{
+    if true then
+      if true then (X := 1 !! X := 2) else skip end
+    else
+      skip
+    end;
+    Y := X + 1;
+    X = 2 -> Z := 3
+  }> 10.
+
+Compute
+  run_interpreter (X !-> 0) <{
+  X := 1 !! X :=2;
+  Y := 1 !! Y :=2;
+  Z := 3;
+  Y=2 -> skip;
+  X=2 -> skip
+}> 20.
+
+Compute
+  run_interpreter (X !-> 0) <{
+  X := 1 !! X :=2;
+  W := 4;
+  Y := 1 !! Y :=2;
+  Z := 3;
+  Y=2 -> skip;
+  X=2 -> skip
+}> 20.
+
+Unset Printing Notations.
+Definition a132 := (<{
+    if true then (X := 1 !! X := 2) else skip end;
+    Y := X + 1;
+    X = 2 -> X := 3
+  }>).
+Print a132.
+Set Printing Notations.
+
+Example test_dsa_4:
+  run_interpreter (X !-> 5) <{ X:=7; X=10 -> X:=11 }> 10 = KO.
+Proof. auto. Qed.
+
 Example test_1: 
   run_interpreter (X !-> 5) <{skip}> 1 = OK [("X", 5); ("Y", 0); ("Z", 0)].
 Proof. auto. Qed.
@@ -81,6 +203,14 @@ Example test_7:
   run_interpreter (X !-> 5) <{ X:= X+1; X=6 -> skip }> 3 = OK [("X", 6); ("Y", 0); ("Z", 0)].
 Proof. auto. Qed.
 
+Unset Printing Notations.
+Compute run_interpreter (X !-> 5) <{ (X := 1 !! X := 2) }> 4.
+Compute run_interpreter (X !-> 5) <{ (X := 1 !! X := 2); (X=2) -> skip }> 5.
+Compute run_interpreter (X !-> 5) <{ (X := 1 !! X := 2); (X=2) -> X := 3 }> 5.
+Definition a1 := (<{ (X := 1 !! X := 2); (X = 2) -> X:=3 }>).
+Print a1.
+Set Printing Notations.
+
 Example test_8:
   run_interpreter (X !-> 5) <{ (X := 1 !! X := 2); (X = 2) -> X:=3 }> 4 = OOG.
 Proof. auto. Qed.
@@ -103,7 +233,6 @@ Example test_11:
   8 
   = OK [("X", 0); ("Y", 5); ("Z", 0)].
 Proof. auto. Qed.
-
 
 
 (**
