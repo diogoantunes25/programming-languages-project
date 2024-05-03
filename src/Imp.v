@@ -194,12 +194,10 @@ Notation "'if' x 'then' y 'else' z 'end'" :=
 Notation "'while' x 'do' y 'end'" :=
          (CWhile x y)
             (in custom com at level 89, x at level 99, y at level 99) : com_scope.
-
 Notation "c1 '!!' c2" :=
          (CChoice c1 c2)
-            (* (in custom com at level 91, no associativity) : com_scope. *)
             (in custom com at level 89, right associativity) : com_scope.
-
+            (* (in custom com at level 91, no associativity) : com_scope. *)
 Notation "b '->' c" :=
          (CGuard b c)
             (in custom com at level 89, no associativity) : com_scope.
