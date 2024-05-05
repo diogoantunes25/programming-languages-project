@@ -32,9 +32,77 @@ Reserved Notation "st1 '/' q1 '=[' c ']=>' st2 '/' q2 '/' r"
 
 Inductive ceval : com -> state -> list (state * com) -> 
           result -> state -> list (state * com) -> Prop :=
-| E_Skip : forall st q,
- st / q =[ skip ]=> st / q / Success
-(* TODO. Hint: follow the same structure as shown in the chapter Imp *)
+  | E_Skip : forall st q,
+    st / q =[ skip ]=> st / q / Success
+
+  | E_Assig : forall st q a n x,
+    aeval st a = n ->
+    st / q =[ x:=a ]=> (x !-> n; st) / q / Success
+
+  | E_Seq_Success : forall st q st1 q1 st2 q2 c1 c2 r,
+    st / q =[ c1 ]=> st1 / q1 / Success ->
+    st1 / q1 =[ c2 ]=> st2 / q2 / r ->
+    st / q =[ c1 ; c2 ]=> st2 / q2 / r
+
+  | E_Seq_Fail : forall st q st1 q1 c1 c2,
+    st / q =[ c1 ]=> st1 / q1 / Fail ->
+    st / q =[ c1 ; c2 ]=> st1 / q1 / Fail
+
+  | E_IfTrue : forall st q st1 q1 b c1 c2 r,
+    beval st b = true ->
+    st / q =[ c1 ]=> st1 / q1 / r ->
+    st / q =[ if b then c1 else c2 end ]=> st1 / q1 / r
+
+  | E_IfFalse : forall st q st2 q2 b c1 c2 r,
+    beval st b = false ->
+    st / q =[ c2 ]=> st2 / q2 / r ->
+    st / q =[ if b then c1 else c2 end ]=> st1 / q1 / r
+
+  | E_WhileFalse : forall b st q c,
+    beval st b = false ->
+    st / q =[ while b do c end ]=> st / q / Success
+
+  | E_WhileTrue_Success : forall st q st1 q1 st2 q2 b c r,
+    beval st b = true ->
+    st / q =[ c ]=> st1 / q1 / Success ->
+    st1 / q1 =[ while b do c end ]=> st2 / q2 / r ->
+    st / q =[ while b do c end ]=> st2 / q2 / r
+
+  | E_WhileTrue_Fail : forall st q st1 q1 b c,
+    beval st b = true ->
+    st / q =[ c ]=> st1 / q1 / Fail ->
+    st / q =[ while b do c end ]=> st1 / q1 / Fail
+
+  | E_NonDeterChoiceSeqLeft : forall st st1 q q1 c1 c2 c3 r,
+    st / (( st , <{ c2 ; c3 }> ) :: q) =[ <{ c1 ; c3 }> ]=> st1 / q1 / r ->
+    st / q =[ <{ c1 !! c2 ; c3 }> ]=> st1 / q1 / r
+
+  | E_NonDeterChoiceSeqRight : forall st st1 q q1 c1 c2 c3 r,
+    st / (( st, <{ c1 ; c3 }> ) :: q) =[ <{ c2 ; c3 }> ]=> st1 / q1 / r -> 
+    st / q =[ <{ c1 !! c2 ; c3 }> ]=> st1 / q1 / r
+
+  | E_NonDeterChoice_Left : forall st q st1 q1 c1 c2 r,
+    st / q =[ c1 ]=> st1 / q1 / r ->
+    st / q =[ c1 !! c2 ]=> st1 / (( st, c2 ) :: q1) / r
+
+  | E_NonDeterChoice_Right : forall st q st1 q1 c1 c2 r,
+    st / q =[ c2 ]=> st1 / q1 / r ->
+    st / q =[ c1 !! c2 ]=> st1 / (( st, c1 ) :: q1) / r
+
+  | E_CondGuardTrue : forall st q st1 q1 b c r,
+    beval st b = true ->
+    st / q =[ c ]=> st1 / q1 / r ->
+    st / q =[ b -> c ]=> st1 / q1 / r
+
+  | E_CondGuardFalseNoCont : forall st st1 b c,
+    beval st b = false ->
+    st / [] =[ b -> c ]=> st1 / [] / Fail
+
+  | E_CondGuardFalseButCont : forall st t b c st1 q1 r1 hc hs  (* hc and hs are the elements of the head element of the continuation ( state , command ) *)
+    beval st b = false ->
+    hs / t =[ hc ]=> st1 / q1 / r1 ->
+    st / (( hs , hc ) :: t) =[ b -> c ]=> st1 / q1 / r1
+
 where "st1 '/' q1 '=[' c ']=>' st2 '/' q2 '/' r" := (ceval c st1 q1 r st2 q2).
 
 
