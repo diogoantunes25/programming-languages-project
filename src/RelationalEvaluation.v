@@ -56,7 +56,7 @@ Inductive ceval : com -> state -> list (state * com) ->
   | E_IfFalse : forall st q st2 q2 b c1 c2 r,
     beval st b = false ->
     st / q =[ c2 ]=> st2 / q2 / r ->
-    st / q =[ if b then c1 else c2 end ]=> st1 / q1 / r
+    st / q =[ if b then c1 else c2 end ]=> st2 / q2 / r
 
   | E_WhileFalse : forall b st q c,
     beval st b = false ->
@@ -98,7 +98,7 @@ Inductive ceval : com -> state -> list (state * com) ->
     beval st b = false ->
     st / [] =[ b -> c ]=> st1 / [] / Fail
 
-  | E_CondGuardFalseButCont : forall st t b c st1 q1 r1 hc hs  (* hc and hs are the elements of the head element of the continuation ( state , command ) *)
+  | E_CondGuardFalseButCont : forall st t b c st1 q1 r1 hc hs,  (* hc and hs are the elements of the head element of the continuation ( state , command ) *)
     beval st b = false ->
     hs / t =[ hc ]=> st1 / q1 / r1 ->
     st / (( hs , hc ) :: t) =[ b -> c ]=> st1 / q1 / r1
