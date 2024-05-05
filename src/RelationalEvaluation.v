@@ -35,9 +35,9 @@ Inductive ceval : com -> state -> list (state * com) ->
   | E_Skip : forall st q,
     st / q =[ skip ]=> st / q / Success
 
-  | E_Assig : forall st q a n x,
+  | E_Asgn : forall st q a n x,
     aeval st a = n ->
-    st / q =[ x:=a ]=> (x !-> n; st) / q / Success
+    st / q =[ x := a ]=> (x !-> n; st) / q / Success
 
   | E_Seq_Success : forall st q st1 q1 st2 q2 c1 c2 r,
     st / q =[ c1 ]=> st1 / q1 / Success ->
@@ -121,8 +121,11 @@ if (X <= 1)
 end
 ]=> (Z !-> 4 ; X !-> 2) / [] / Success.
 Proof.
-  (* TODO *)
-  Admitted.
+  apply E_Seq_Success with (X !-> 2) [].
+  - auto. apply E_Asgn. auto.
+  - apply E_IfFalse. auto. apply E_Asgn. auto.   
+Qed.
+
 
 
 Example ceval_example_guard1:
@@ -131,8 +134,10 @@ empty_st / [] =[
    (X = 1) -> X:=3
 ]=> (empty_st) / [] / Fail.
 Proof.
-  (* TODO *)
-  Admitted.
+  apply E_Seq_Success with (X !-> 2) [].
+  - auto. apply E_Asgn. auto.
+  - apply E_CondGuardFalseNoCont. auto.
+Qed.
 
 Example ceval_example_guard2:
 empty_st / [] =[
@@ -140,8 +145,13 @@ empty_st / [] =[
    (X = 2) -> X:=3
 ]=> (X !-> 3 ; X !-> 2) / [] / Success.
 Proof.
-  (* TODO *)
-  Admitted.
+  apply E_Seq_Success with (X !-> 2) [].
+  - auto. apply E_Asgn. auto.
+  - apply E_CondGuardTrue. auto. apply E_Asgn. auto.
+Qed.
+
+(* Choose c2 in c1 !! c2 so there's no backtracking to be done *)
+(* Therefore the continuation at the end should be [(st, c1;c3)] *)
 
 Example ceval_example_guard3: exists q,
 empty_st / [] =[
@@ -149,8 +159,18 @@ empty_st / [] =[
    (X = 2) -> X:=3
 ]=> (X !-> 3) / q / Success.
 Proof.
-  (* TODO *)
-  Admitted.
+  exists [(empty_st, <{ X := 1; X = 2 -> X := 3 }>)].
+  apply E_NonDeterChoiceSeqRight. auto.
+  apply E_Seq_Success with (X !-> 2) [(empty_st, <{ X := 1; X = 2 -> X := 3 }>)]; auto.
+  apply E_Asgn; auto.
+  apply E_CondGuardTrue; auto.
+  replace (X !-> 3) with (X !-> 3; X !-> 2); try apply t_update_shadow.
+  auto.
+  apply E_Asgn. auto.
+Qed.
+
+(* Choose c1 in c1 !! c2 so there's backtracking to be done *)
+(* Therefore the continuation at the end should be [] *)
     
 Example ceval_example_guard4: exists q,
 empty_st / [] =[
@@ -158,8 +178,19 @@ empty_st / [] =[
    (X = 2) -> X:=3
 ]=> (X !-> 3) / q / Success.
 Proof.
-  (* TODO *)
-  Admitted.
+  exists [].
+  apply E_NonDeterChoiceSeqLeft. auto.
+  apply E_Seq_Success with (X !-> 1) [(empty_st, <{ X := 2; X = 2 -> X := 3 }>)]. auto.
+  - apply E_Asgn. auto.
+  - apply E_CondGuardFalseButCont. auto.
+    apply E_Seq_Success with (X !-> 2) [].
+    + apply E_Asgn. auto.
+    + apply E_CondGuardTrue. auto.
+    replace (X!->3) with (X!->3; X!->2); try apply t_update_shadow.
+    apply E_Asgn. auto.
+Qed. 
+
+
 
 
 
