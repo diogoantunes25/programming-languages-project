@@ -69,12 +69,14 @@ Inductive ceval : com -> state -> list (state * com) ->
     beval st b = true  ->
     st / q =[ c1 ]=> st' / q' / Fail ->
     st / q =[ while b do c1 end ]=> st'' / q'' / Fail
-| E_Choice_L: forall st st' q q' c1 c2 r,
-    st / q =[ c1 ]=> st' / q' / r ->
-    let q'' := (st,c2)::q in st / q =[ c1 !! c2 ]=> st'/ q'' / r
-| E_Choice_R: forall st st' q q' c1 c2 r,
-    st / q =[ c2 ]=> st' / q' / r ->
-    let q'' := (st,c1)::q in st / q =[ c1 !! c2 ]=> st'/ q'' / r
+| E_Choice_L: forall st st' q q'' c1 c2 r,
+    let q' := (st,c2)::q in 
+    st / q' =[ c1 ]=> st' / q'' / r ->
+    st / q =[ c1 !! c2 ]=> st'/ q'' / r
+| E_Choice_R: forall st st' q q'' c1 c2 r,
+    let q' := (st,c1)::q in 
+    st / q' =[ c2 ]=> st' / q'' / r ->
+    st / q =[ c1 !! c2 ]=> st'/ q'' / r
 | E_Choice_Seq_Suc_L: forall st st' st'' q q' q'' q''' c1 c2 c3 r,
     st / q =[ c1 ]=> st' / q' / Success ->
     q'' = (st, <{ c2;c3 }>) :: q ->
@@ -342,13 +344,13 @@ Proof.
                      rewrite <- H21 in H26. 
                      unfold aeval in H26. unfold beval in H26. simpl in H26.
                      exfalso. discriminate.
-                 ----- (* guard false *)
+                 -----(* guard false *)
                       (* show that most recent continuation is X := 2 *)
-                      rewrite <- H15 in H27.
+                      rewrite <- H23 in H27.
                       inversion H27.
                       rewrite <- H36 in H33.
                       inversion H33.
-                      exists q'0.
+                      exists q2.
                       unfold aeval in H41.
                       rewrite <- H41.
                       apply E_Asgn.
@@ -359,7 +361,7 @@ Proof.
                  ----- (* guard true*)
                        inversion H32.
                        rewrite <- H37.
-                       exists q'0.
+                       exists q1.
                        rewrite <- H22.
                        apply E_Asgn. 
                        trivial.
@@ -393,14 +395,14 @@ Proof.
                (* this is what happened *)
                exists q'0.
                (* show that continuation is what we want *)
-               rewrite <- H15 in H27.
+               rewrite <- H23 in H27.
                inversion H27.
-               (* FIXME: c' show include the guard *)
+               (* FIXME: c' should include the guard *)
                rewrite <- H36 in H33.
                inversion H33.
            ---- (* guard fails and there's no continuation *)
-                 rewrite <- H27 in H15.
-                 inversion H15.
+               rewrite <- H27 in H23.
+               inversion H23.
        --- (* chose right *)
             inversion H16.
             inversion H8.
@@ -529,8 +531,9 @@ Proof.
   intros c.
   unfold cequiv. split.
   - unfold cequiv_imp. intros.
-    inversion H;
-      exists q';
+    inversion H.
+    -- (* chose left *)
+      exists q'.
       assumption.
   - unfold cequiv_imp. intros.
     exists ((st1, c)::q1).
@@ -542,6 +545,16 @@ Qed.
 Lemma choice_comm: forall c1 c2,
 <{ c1 !! c2 }> == <{ c2 !! c1 }>.
 Proof.
+  intros.
+  unfold cequiv. split.
+  - unfold cequiv_imp. intros.
+    inversion H.
+    -- (* Chose left *)
+       rewrite <- H6 in H.
+       exists q''.
+       apply E_Choice_R with (q' := q'').
+       assumption.
+
   (* TODO: I don't think this lemma is true *)
 Admitted.
 
