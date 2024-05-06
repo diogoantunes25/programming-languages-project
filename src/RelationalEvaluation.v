@@ -205,14 +205,6 @@ Proof.
                           destruct (eqb_string X x); trivial.
 Qed.
 
-(* choose right *)
-    
-(* | E_Choice_Seq_Suc_R: forall st st' st'' q q' q'' q''' c1 c2 c3 r, *)
-(*     st / q =[ c2 ]=> st' / q' / Success -> *)
-(*     q'' = (st, <{ c1;c3 }>) :: q -> *)
-(*     st' / q'' =[ c3 ]=> st'' / q''' / r -> *)
-(*     st / q =[ (c1!!c2);c3 ]=> st'' / q''' / r *)
-
 Example ceval_example_guard4: exists q,
 empty_st / [] =[
    (X := 1 !! X := 2);
@@ -616,6 +608,23 @@ Proof.
           assumption.
 Qed.
 
+(* (c0 !! c4); (c2 !! c3) - choose c0 first *)
+(* (((c0 !! c4); c2) !! ((c0 !! c4); c3)) - choose c2 first *)
+
+(*
+c0 = X := 2
+c4 = X := 2
+c2 = X := 1; Y := 15
+c3 = X := 2; Y := 15
+
+(((c0 !! c4); c2) !! ((c0 !! c4); c3)); X = 2 -> skip (Y can end with 10)
+
+(c0 !! c4); (c2 !! c3); X = 2 -> skip (Y ends with 15)
+
+
+*)
+
+
 Lemma choice_seq_distr_l: forall c1 c2 c3,
 <{ c1 ; (c2 !! c3)}> == <{ (c1;c2) !! (c1;c3) }>.
 Proof.
@@ -677,38 +686,60 @@ Proof.
                 assumption.
            ---- (* continuity matches *)
                 trivial.
-           ---- 
-
-| E_Choice_Seq_Suc_L: forall st st' st'' q q' q'' q''' c1 c2 c3 r,
-
-    st / q =[ c1 ]=> st' / q' / Success ->
-    q'' = (st, <{ c2;c3 }>) :: q ->
-    st' / q'' =[ c3 ]=> st'' / q''' / r ->
-    st / q =[ (c1!!c2);c3 ]=> st'' / q''' / r
-
-           ---- (* left side *)
-                assumption.
-           ---- (* right side *)
-                assumption.
-       --- (* chose right - c3 *)
-           exists ((st1, <{ c1; c2 }>)::q1).
-           apply E_Choice_R with (q' := q'0).
-           apply E_Seq_Suc with (st' := st') (q' := q').
-           ---- (* left side *)
-                assumption.
-           ---- (* right side *)
-                assumption.
-
-                
-
+Admitted.
 
 
   (* TODO *)
-Qed.
+(* Qed. *)
 
 Lemma choice_congruence: forall c1 c1' c2 c2',
 c1 == c1' -> c2 == c2' ->
 <{ c1 !! c2 }> == <{ c1' !! c2' }>.
 Proof.
-  (* TODO *)
+    intros.
+    unfold cequiv. split.
+    - unfold cequiv_imp. intros.
+      inversion H1.
+      -- (* chose left *)
+         unfold cequiv in H. destruct H as [Hl Hr].
+
+         unfold cequiv_imp in Hl.
+         apply Hl in H9.
+         destruct H9 as [q4 HQ1].
+
+         exists ((st1, c2')::q1).
+         apply E_Choice_L with (q' := q4).
+         trivial.
+      -- (* chose right *)
+         unfold cequiv in H0. destruct H0 as [Hl Hr].
+
+         unfold cequiv_imp in Hl.
+         apply Hl in H9.
+         destruct H9 as [q4 HQ1].
+
+         exists ((st1, c1')::q1).
+         apply E_Choice_R with (q' := q4).
+         trivial.
+    - unfold cequiv_imp. intros.
+      inversion H1.
+      -- (* chose left *)
+         unfold cequiv in H. destruct H as [Hl Hr].
+
+         unfold cequiv_imp in Hr.
+         apply Hr in H9.
+         destruct H9 as [q4 HQ1].
+
+         exists ((st1, c2)::q1).
+         apply E_Choice_L with (q' := q4).
+         trivial.
+      -- (* chose right *)
+         unfold cequiv in H0. destruct H0 as [Hl Hr].
+
+         unfold cequiv_imp in Hr.
+         apply Hr in H9.
+         destruct H9 as [q4 HQ1].
+
+         exists ((st1, c1)::q1).
+         apply E_Choice_R with (q' := q4).
+         trivial.
 Qed.
