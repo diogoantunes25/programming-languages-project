@@ -69,16 +69,27 @@ Inductive ceval : com -> state -> list (state * com) ->
     beval st b = true  ->
     st / q =[ c1 ]=> st' / q' / Fail ->
     st / q =[ while b do c1 end ]=> st'' / q'' / Fail
-| E_Choice: forall st st' q q' c1 c2 r,
+| E_Choice_L: forall st st' q q' c1 c2 r,
     st / q =[ c1 ]=> st' / q' / r ->
     let q'' := (st,c2)::q in st / q =[ c1 !! c2 ]=> st'/ q'' / r
-| E_Choice_Seq_Suc: forall st st' st'' q q' q'' q''' c1 c2 c3 r,
+| E_Choice_R: forall st st' q q' c1 c2 r,
+    st / q =[ c2 ]=> st' / q' / r ->
+    let q'' := (st,c1)::q in st / q =[ c1 !! c2 ]=> st'/ q'' / r
+| E_Choice_Seq_Suc_L: forall st st' st'' q q' q'' q''' c1 c2 c3 r,
     st / q =[ c1 ]=> st' / q' / Success ->
     q'' = (st, <{ c2;c3 }>) :: q ->
     st' / q'' =[ c3 ]=> st'' / q''' / r ->
     st / q =[ (c1!!c2);c3 ]=> st'' / q''' / r
-| E_Choice_Seq_Fail: forall st st' st'' q q' q'' c1 c2 c3,
+| E_Choice_Seq_Suc_R: forall st st' st'' q q' q'' q''' c1 c2 c3 r,
+    st / q =[ c2 ]=> st' / q' / Success ->
+    q'' = (st, <{ c1;c3 }>) :: q ->
+    st' / q'' =[ c3 ]=> st'' / q''' / r ->
+    st / q =[ (c1!!c2);c3 ]=> st'' / q''' / r
+| E_Choice_Seq_Fail_L: forall st st' st'' q q' q'' c1 c2 c3,
     st / q =[ c1 ]=> st' / q' / Fail ->
+    st / q =[ (c1!!c2);c3 ]=> st'' / q'' / Fail
+| E_Choice_Seq_Fail_R: forall st st' st'' q q' q'' c1 c2 c3,
+    st / q =[ c2 ]=> st' / q' / Fail ->
     st / q =[ (c1!!c2);c3 ]=> st'' / q'' / Fail
 | E_Guard_True: forall st st' q q' b c1 r,
     beval st b = true  ->
@@ -147,6 +158,8 @@ Proof.
        apply E_Asgn. trivial.
 Qed. 
 
+(* choose left *)
+
 Example ceval_example_guard3: exists q,
 empty_st / [] =[
    (X := 1 !! X := 2);
@@ -154,7 +167,7 @@ empty_st / [] =[
 ]=> (X !-> 3) / q / Success.
 Proof.
   exists [].
-  apply E_Choice_Seq_Suc with
+  apply E_Choice_Seq_Suc_L with
   (* forall st st' st'' q q' q'' c1 c2 c3 r, *)
     (st := empty_st) (st' := (X !-> 1)) (st'' := (X !-> 3))
     (q := []) (q'' := ((empty_st, <{ X :=2; X=2 -> X:=3 }> ) :: []))
@@ -189,48 +202,38 @@ Proof.
                           unfold t_update.
                           destruct (eqb_string X x); trivial.
 Qed.
+
+(* choose right *)
     
+(* | E_Choice_Seq_Suc_R: forall st st' st'' q q' q'' q''' c1 c2 c3 r, *)
+(*     st / q =[ c2 ]=> st' / q' / Success -> *)
+(*     q'' = (st, <{ c1;c3 }>) :: q -> *)
+(*     st' / q'' =[ c3 ]=> st'' / q''' / r -> *)
+(*     st / q =[ (c1!!c2);c3 ]=> st'' / q''' / r *)
+
 Example ceval_example_guard4: exists q,
 empty_st / [] =[
    (X := 1 !! X := 2);
    (X = 2) -> X:=3
 ]=> (X !-> 3) / q / Success.
 Proof.
-  exists [].
-  apply E_Choice_Seq_Suc with
-  (* forall st st' st'' q q' q'' c1 c2 c3 r, *)
-    (st := empty_st) (st' := (X !-> 1)) (st'' := (X !-> 3))
-    (q := []) (q'' := ((empty_st, <{ X :=2; X=2 -> X:=3 }> ) :: []))
-    (q' := [])
-    (q''' := [])
-    (c1 := <{ X:=1 }>)
-    (c2 := <{ X:=2 }>)
-    (c3 := <{ X=2 -> X:=3 }>)
-    (r := Success).
+  exists [(empty_st, <{ X := 1; X = 2 -> X := 3 }>)].
+  apply E_Choice_Seq_Suc_R with (st' := (X !-> 2)) (q' := [])
+  (q'' := [ (empty_st, <{ X := 1; X = 2 -> X := 3 }>) ]).
     - (* first choice *)
       apply E_Asgn. trivial.
     - (* compose continuation *)
       trivial.
     - (* last command *)
-      apply E_Guard_Backtrack with (q' := [])
-        (st' := empty_st)
-        (c' := <{ X :=2; X=2 -> X:=3 }>).
-        -- (* condition *)
-           trivial.
-        -- trivial.
-        -- apply E_Seq_Suc with (st' := X !-> 2) (q' := []).
-           --- (* left *)
-               ---- apply E_Asgn. trivial.
-           --- (* right *)
-               apply E_Guard_True.
-               ---- (* condition *)
-                    trivial.
-               ---- (* body *)
-                    replace (X !-> 3) with (X !-> 3; X !-> 2).
-                    ----- apply E_Asgn. trivial.
-                    ----- apply functional_extensionality. intros x.
-                          unfold t_update.
-                          destruct (eqb_string X x); trivial.
+      apply E_Guard_True.
+      -- (* prove guard true *)
+         unfold beval. simpl. trivial.
+      -- (* body *)
+          replace (X !-> 3) with (X !-> 3; X !-> 2).
+          --- apply E_Asgn. trivial.
+          --- apply functional_extensionality. intros x.
+              unfold t_update.
+              destruct (eqb_string X x); trivial.
 Qed.
 
 (* 3.2. Behavioral equivalence *)
@@ -330,54 +333,90 @@ Proof.
        (* this happens to work *)
        (* prove that guard fails*)
        --- inversion H2.
-           inversion H16.
-           inversion H8.
-           ---- (* guard true *)
-               inversion H32.
-               rewrite <- H22 in H26.
-               rewrite <- H21 in H26. 
-               unfold aeval in H26. unfold beval in H26. simpl in H26.
-               exfalso. discriminate.
-           ---- (* guard false *)
-                (* show that most recent continuation is X := 2 *)
-                rewrite <- H15 in H27.
-                inversion H27.
-                rewrite <- H36 in H33.
-                inversion H33.
-                exists q'0.
-                unfold aeval in H41.
-                rewrite <- H41.
-                apply E_Asgn.
-                unfold aeval. trivial.
+           ---- (* chose left *)
+                 inversion H16.
+                 inversion H8.
+                 ----- (* guard true *)
+                     inversion H32.
+                     rewrite <- H22 in H26.
+                     rewrite <- H21 in H26. 
+                     unfold aeval in H26. unfold beval in H26. simpl in H26.
+                     exfalso. discriminate.
+                 ----- (* guard false *)
+                      (* show that most recent continuation is X := 2 *)
+                      rewrite <- H15 in H27.
+                      inversion H27.
+                      rewrite <- H36 in H33.
+                      inversion H33.
+                      exists q'0.
+                      unfold aeval in H41.
+                      rewrite <- H41.
+                      apply E_Asgn.
+                      unfold aeval. trivial.
+           ---- (* chose right *)
+                inversion H16.
+                inversion H8.
+                 ----- (* guard true*)
+                       inversion H32.
+                       rewrite <- H37.
+                       exists q'0.
+                       rewrite <- H22.
+                       apply E_Asgn. 
+                       trivial.
+                 ----- (* guard false *)
+                       (* prove contradiction *)
+                       rewrite <- H21 in H22.
+                       rewrite <- H22 in H26.
+                       unfold beval in H26. unfold aeval in H26. simpl in H26.
+                       exfalso. discriminate.
     -- (* use seq_fail_1 *)
        (* this doesn't work *)
        inversion H7.
-       inversion H15.
+       --- (* chose left *)
+            inversion H15.
+       --- (* chose right *)
+            inversion H15.
     -- (* use seq_fail_2 - FIXME: this is not right *)
        inversion H2.
+       --- (* chose left *)
 
-       (* need to prove that guard fails *)
-       inversion H16.
-       inversion H8.
-       --- (* guard succeds - false *)
-           rewrite <- H22 in H26.
-           rewrite <- H21 in H26.
-           unfold beval in H26. unfold aeval in H26.
-           simpl in H26.
-           exfalso. discriminate.
-       --- (* guard fails and there's continuation *)
-           (* this is what happened *)
-           exists q'0.
-           (* show that continuation is what we want *)
-           rewrite <- H15 in H27.
-           inversion H27.
-           (* FIXME: c' show include the guard *)
-           rewrite <- H36 in H33.
-           inversion H33.
-       --- (* guard fails and there's no continuation *)
-           rewrite <- H27 in H15.
-           inversion H15.
-    -- (* use seq_choice_suc *)
+           (* need to prove that guard fails *)
+           inversion H16.
+           inversion H8.
+           ---- (* guard succeds - false *)
+                 rewrite <- H22 in H26.
+                 rewrite <- H21 in H26.
+                 unfold beval in H26. unfold aeval in H26.
+                 simpl in H26.
+                 exfalso. discriminate.
+           ---- (* guard fails and there's continuation *)
+               (* this is what happened *)
+               exists q'0.
+               (* show that continuation is what we want *)
+               rewrite <- H15 in H27.
+               inversion H27.
+               (* FIXME: c' show include the guard *)
+               rewrite <- H36 in H33.
+               inversion H33.
+           ---- (* guard fails and there's no continuation *)
+                 rewrite <- H27 in H15.
+                 inversion H15.
+       --- (* chose right *)
+            inversion H16.
+            inversion H8.
+            ---- (* guard succeds - true *)
+                 inversion H32.
+           ---- (* guard fails and there's continuation *)
+                rewrite <- H21 in H22.
+                rewrite <- H22 in H26.
+                unfold beval in H26. unfold aeval in H26. simpl in H26.
+                exfalso. discriminate.
+           ---- (* guard fails and there's no continuation *)
+                rewrite <- H21 in H22.
+                rewrite <- H22 in H28.
+                unfold beval in H28. unfold aeval in H28. simpl in H28.
+                exfalso. discriminate.
+    -- (* use seq_choice_suc_L *)
        inversion H3.
        inversion H10.
        --- (* guard succeds - false *)
@@ -438,12 +477,32 @@ Proof.
        --- (* guard fails and there's no continuation - this is not the case*)
            rewrite <- H21 in H9.
            inversion H9.
-    -- (* use seq_choice_fail *)
+    -- (* use seq_choice_suc_R *)
+       inversion H3.
+       inversion H10.
+       --- (* guard passed - what happened *)
+            inversion H26. 
+            exists q'.
+            rewrite H17 in H3.
+            rewrite <- H31.
+            assumption.
+       --- (* guard failed - did not happen *)
+           rewrite <- H16 in H20.
+           rewrite <- H15 in H20.
+           unfold aeval in H20. unfold beval in H20. simpl in H20.
+           exfalso. discriminate.
+       --- rewrite <- H16 in H25.
+           rewrite <- H15 in H25.
+           unfold aeval in H25. unfold beval in H25. simpl in H25.
+           exfalso. discriminate.
+    -- (* use seq_choice_fail_R *)
+       inversion H8.
+    -- (* use seq_choice_fail_L *)
        inversion H8.
   - unfold cequiv_imp. intros.
     inversion H.
     exists q2.
-    apply E_Choice_Seq_Suc with (st' := (X !-> 1; st1)) (q' := q2)
+    apply E_Choice_Seq_Suc_L with (st' := (X !-> 1; st1)) (q' := q2)
       (q'' := (st1, <{ X := 2; X=2 -> skip }>) :: q2).
     -- (* prove c1 *)
        apply E_Asgn.
@@ -470,16 +529,14 @@ Proof.
   intros c.
   unfold cequiv. split.
   - unfold cequiv_imp. intros.
-    inversion H.
-    exists q'.
-    assumption.
-    (* FIXME: seems too simple *)
+    inversion H;
+      exists q';
+      assumption.
   - unfold cequiv_imp. intros.
     exists ((st1, c)::q1).
-    apply E_Choice with (st := st1) (st' := st2) (c1 := c) (c2 := c) (r := result0)
+    apply E_Choice_L with (st := st1) (st' := st2) (c1 := c) (c2 := c) (r := result0)
     (q := q1) (q' := q2).
     assumption.
-    (* FIXME: seems too simple *)
 Qed.
 
 Lemma choice_comm: forall c1 c2,
