@@ -73,14 +73,6 @@ Inductive ceval : com -> state -> list (state * com) ->
     st / q =[ c ]=> st1 / q1 / Fail ->
     st / q =[ while b do c end ]=> st1 / q1 / Fail
 
-  | E_NonDeterChoiceSeqLeft : forall st st1 q q1 c1 c2 c3 r,
-    st / (( st , <{ c2 ; c3 }> ) :: q) =[ <{ c1 ; c3 }> ]=> st1 / q1 / r ->
-    st / q =[ <{ c1 !! c2 ; c3 }> ]=> st1 / q1 / r
-
-  | E_NonDeterChoiceSeqRight : forall st st1 q q1 c1 c2 c3 r,
-    st / (( st, <{ c1 ; c3 }> ) :: q) =[ <{ c2 ; c3 }> ]=> st1 / q1 / r -> 
-    st / q =[ <{ c1 !! c2 ; c3 }> ]=> st1 / q1 / r
-
   | E_NonDeterChoice_Left : forall st q st1 q1 c1 c2 r,
     st / q =[ c1 ]=> st1 / q1 / r ->
     st / q =[ c1 !! c2 ]=> st1 / (( st, c2 ) :: q1) / r
@@ -100,7 +92,8 @@ Inductive ceval : com -> state -> list (state * com) ->
 
   | E_CondGuardFalseButCont : forall st t b c st1 q1 r1 hc hs,  (* hc and hs are the elements of the head element of the continuation ( state , command ) *)
     beval st b = false ->
-    hs / t =[ hc ]=> st1 / q1 / r1 ->
+    (*hs / t =[ hc ]=> st1 / q1 / r1 ->*)   
+    st / t =[ hc ; b -> c ]=> st1 / q1 / r1 ->
     st / (( hs , hc ) :: t) =[ b -> c ]=> st1 / q1 / r1
 
 where "st1 '/' q1 '=[' c ']=>' st2 '/' q2 '/' r" := (ceval c st1 q1 r st2 q2).
@@ -159,15 +152,15 @@ empty_st / [] =[
    (X = 2) -> X:=3
 ]=> (X !-> 3) / q / Success.
 Proof.
-  exists [(empty_st, <{ X := 1; X = 2 -> X := 3 }>)].
-  apply E_NonDeterChoiceSeqRight. auto.
-  apply E_Seq_Success with (X !-> 2) [(empty_st, <{ X := 1; X = 2 -> X := 3 }>)]; auto.
-  apply E_Asgn; auto.
-  apply E_CondGuardTrue; auto.
-  replace (X !-> 3) with (X !-> 3; X !-> 2); try apply t_update_shadow.
-  auto.
+  exists [(empty_st, <{ X := 1 }>)].
+  apply E_Seq_Success with (X !-> 2) [(empty_st, <{ X := 1 }>)].
+  - apply E_NonDeterChoice_Right. auto.
+    apply E_Asgn. auto.
+  - apply E_CondGuardTrue. auto.
+  replace (X!->3) with (X!->3; X!->2); try apply t_update_shadow.
   apply E_Asgn. auto.
 Qed.
+
 
 (* Choose c1 in c1 !! c2 so there's backtracking to be done *)
 (* Therefore the continuation at the end should be [] *)
@@ -179,20 +172,16 @@ empty_st / [] =[
 ]=> (X !-> 3) / q / Success.
 Proof.
   exists [].
-  apply E_NonDeterChoiceSeqLeft. auto.
-  apply E_Seq_Success with (X !-> 1) [(empty_st, <{ X := 2; X = 2 -> X := 3 }>)]. auto.
-  - apply E_Asgn. auto.
-  - apply E_CondGuardFalseButCont. auto.
-    apply E_Seq_Success with (X !-> 2) [].
-    + apply E_Asgn. auto.
-    + apply E_CondGuardTrue. auto.
-    replace (X!->3) with (X!->3; X!->2); try apply t_update_shadow.
-    apply E_Asgn. auto.
+  apply E_Seq_Success with (X !-> 1) [(empty_st, <{ X := 2 }>)].
+  - apply E_NonDeterChoice_Left. apply E_Asgn. auto.
+  -  apply E_CondGuardFalseButCont. auto.
+      apply E_Seq_Success with (X !-> 2) [].
+      + replace (X!->2) with (X!->2; X!->1); try apply t_update_shadow.
+        apply E_Asgn. auto.
+      + apply E_CondGuardTrue. auto.
+        replace (X!->3) with (X!->3; X!->2); try apply t_update_shadow.
+        apply E_Asgn. auto.
 Qed. 
-
-
-
-
 
 (* 3.2. Behavioral equivalence *)
 
@@ -218,6 +207,7 @@ Lemma cequiv_ex1:
 Proof.
   (* TODO *)
   Admitted.
+  
 
 Lemma cequiv_ex2:
 <{ (X := 1 !! X := 2); X = 2 -> skip }> == 
