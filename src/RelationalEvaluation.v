@@ -34,7 +34,7 @@ Reserved Notation "st1 '/' q1 '=[' c ']=>' st2 '/' q2 '/' r"
 Inductive ceval : com -> state -> list (state * com) -> 
           result -> state -> list (state * com) -> Prop :=
 | E_Skip : forall st q,
- st / q =[ skip ]=> st / q / Success
+    st / q =[ skip ]=> st / q / Success
 | E_Asgn: forall st q a n x,
     aeval st a = n -> 
     st / q =[ x := a ]=> (x !-> n; st) / q / Success
@@ -77,22 +77,6 @@ Inductive ceval : com -> state -> list (state * com) ->
     (* continuation from inside right side is discarded *)
     st / q =[ c2 ]=> st' / q' / r ->
     let q'' := (st,c1)::q in st / q =[ c1 !! c2 ]=> st'/ q'' / r
-| E_Choice_Seq_Suc_L: forall st st' st'' q q' q'' q''' c1 c2 c3 r,
-    st / q =[ c1 ]=> st' / q' / Success ->
-    q'' = (st, <{ c2;c3 }>) :: q ->
-    st' / q'' =[ c3 ]=> st'' / q''' / r ->
-    st / q =[ (c1!!c2);c3 ]=> st'' / q''' / r
-| E_Choice_Seq_Suc_R: forall st st' st'' q q' q'' q''' c1 c2 c3 r,
-    st / q =[ c2 ]=> st' / q' / Success ->
-    q'' = (st, <{ c1;c3 }>) :: q ->
-    st' / q'' =[ c3 ]=> st'' / q''' / r ->
-    st / q =[ (c1!!c2);c3 ]=> st'' / q''' / r
-| E_Choice_Seq_Fail_L: forall st st' st'' q q' q'' c1 c2 c3,
-    st / q =[ c1 ]=> st' / q' / Fail ->
-    st / q =[ (c1!!c2);c3 ]=> st'' / q'' / Fail
-| E_Choice_Seq_Fail_R: forall st st' st'' q q' q'' c1 c2 c3,
-    st / q =[ c2 ]=> st' / q' / Fail ->
-    st / q =[ (c1!!c2);c3 ]=> st'' / q'' / Fail
 | E_Guard_True: forall st st' q q' b c1 r,
     beval st b = true  ->
     st / q =[ c1 ]=> st' / q' / r ->
@@ -100,7 +84,7 @@ Inductive ceval : com -> state -> list (state * com) ->
 | E_Guard_Backtrack: forall st st' st'' q q' q'' b c c' r,
     beval st b = false ->
     q = (st', c')::q' ->
-    st' / q' =[ c' ]=> st'' / q'' / r ->
+    st' / q' =[ c'; b -> c ]=> st'' / q'' / r ->
     st / q =[ b -> c ]=> st'' / q'' / r
 | E_Guard_Fail: forall st st' b c,
     beval st b = false ->
@@ -169,40 +153,29 @@ empty_st / [] =[
 ]=> (X !-> 3) / q / Success.
 Proof.
   exists [].
-  apply E_Choice_Seq_Suc_L with
-  (* forall st st' st'' q q' q'' c1 c2 c3 r, *)
-    (st := empty_st) (st' := (X !-> 1)) (st'' := (X !-> 3))
-    (q := []) (q'' := ((empty_st, <{ X :=2; X=2 -> X:=3 }> ) :: []))
-    (q' := [])
-    (q''' := [])
-    (c1 := <{ X:=1 }>)
-    (c2 := <{ X:=2 }>)
-    (c3 := <{ X=2 -> X:=3 }>)
-    (r := Success).
-    - (* first choice *)
-      apply E_Asgn. trivial.
-    - (* compose continuation *)
-      trivial.
-    - (* last command *)
-      apply E_Guard_Backtrack with (q' := [])
-        (st' := empty_st)
-        (c' := <{ X :=2; X=2 -> X:=3 }>).
-        -- (* condition *)
-           trivial.
-        -- trivial.
-        -- apply E_Seq_Suc with (st' := X !-> 2) (q' := []).
-           --- (* left *)
-               ---- apply E_Asgn. trivial.
-           --- (* right *)
-               apply E_Guard_True.
-               ---- (* condition *)
-                    trivial.
-               ---- (* body *)
-                    replace (X !-> 3) with (X !-> 3; X !-> 2).
-                    ----- apply E_Asgn. trivial.
-                    ----- apply functional_extensionality. intros x.
-                          unfold t_update.
-                          destruct (eqb_string X x); trivial.
+  eapply E_Seq_Suc.
+  - (* left part *)
+    apply E_Choice_L with (q' := []).
+    apply E_Asgn. trivial.
+  - (* right part *)
+    apply E_Guard_Backtrack with (st' := empty_st) (q' := []) (c' := <{X:=2}>).
+    -- (* prove guard false *)
+       trivial.
+    -- (* prove continuations match *)
+       trivial.
+    -- apply E_Seq_Suc with (st' := (X !-> 2)) (q' := []).
+       --- (* left part *)
+           apply E_Asgn. trivial.
+       --- (* right part *)
+           apply E_Guard_True.
+           ---- (* prove condition true *)
+                trivial.
+           ---- replace (X !-> 3) with (X !-> 3; X !-> 2).
+                ----- (* body *)
+                      apply E_Asgn. trivial.
+                ----- apply functional_extensionality. intros x.
+                      unfold t_update.
+                      destruct (eqb_string X x); trivial.
 Qed.
 
 Example ceval_example_guard4: exists q,
@@ -211,23 +184,19 @@ empty_st / [] =[
    (X = 2) -> X:=3
 ]=> (X !-> 3) / q / Success.
 Proof.
-  exists [(empty_st, <{ X := 1; X = 2 -> X := 3 }>)].
-  apply E_Choice_Seq_Suc_R with (st' := (X !-> 2)) (q' := [])
-  (q'' := [ (empty_st, <{ X := 1; X = 2 -> X := 3 }>) ]).
-    - (* first choice *)
-      apply E_Asgn. trivial.
-    - (* compose continuation *)
-      trivial.
-    - (* last command *)
-      apply E_Guard_True.
-      -- (* prove guard true *)
-         unfold beval. simpl. trivial.
-      -- (* body *)
-          replace (X !-> 3) with (X !-> 3; X !-> 2).
-          --- apply E_Asgn. trivial.
-          --- apply functional_extensionality. intros x.
-              unfold t_update.
-              destruct (eqb_string X x); trivial.
+  eexists.
+  apply E_Seq_Suc with (st' := (X !-> 2)) (q' := [(empty_st, <{ X := 1 }>)]).
+  - apply E_Choice_R with (q' := []).
+    apply E_Asgn. trivial.
+  - apply E_Guard_True.
+    -- (* prove condition true *)
+       trivial.
+    -- (* body *)
+       replace (X !-> 3) with (X !-> 3; X !-> 2).
+       --- apply E_Asgn. trivial.
+       --- apply functional_extensionality. intros x.
+           unfold t_update.
+           destruct (eqb_string X x); trivial.
 Qed.
 
 (* 3.2. Behavioral equivalence *)
@@ -326,7 +295,7 @@ Proof.
     -- (* use seq_suc *)
        (* this happens to work *)
        (* prove that guard fails*)
-       --- inversion H2.
+       --- inversion H2. 
            ---- (* chose left *)
                  inversion H16.
                  inversion H8.
@@ -336,17 +305,23 @@ Proof.
                      rewrite <- H21 in H26. 
                      unfold aeval in H26. unfold beval in H26. simpl in H26.
                      exfalso. discriminate.
-                 ----- (* guard false *)
+                 -----(* guard false *)
                       (* show that most recent continuation is X := 2 *)
                       rewrite <- H15 in H27.
                       inversion H27.
                       rewrite <- H36 in H33.
                       inversion H33.
+                      inversion H39.
                       exists q'0.
-                      unfold aeval in H41.
-                      rewrite <- H41.
-                      apply E_Asgn.
-                      unfold aeval. trivial.
+                      subst.
+                      inversion H42.
+                      ------ (* guard true - what happens *)
+                             subst. simpl aeval in *.
+                             inversion H10.
+                             apply E_Asgn. trivial.
+                      ------ (* guard false - didn't happen *)
+                             subst. simpl in H3.
+                             exfalso. discriminate.
            ---- (* chose right *)
                 inversion H16.
                 inversion H8.
@@ -385,136 +360,58 @@ Proof.
                  exfalso. discriminate.
            ---- (* guard fails and there's continuation *)
                (* this is what happened *)
-               exists q'0.
                (* show that continuation is what we want *)
-               rewrite <- H15 in H27.
-               inversion H27.
-               (* FIXME: c' show include the guard *)
-               rewrite <- H36 in H33.
+               subst.
+               inversion H27. 
+               rewrite <- H3 in H33.
                inversion H33.
+                 ----- (* first failed *)
+                       inversion H9. 
+                 ----- (* second failed *)
+                       inversion H10.
+                      ------ (* guard true *)
+                             subst.
+                             inversion H22.
+                      ------ (* guard false but continuation *)
+                             subst.
+                             inversion H6.
+                             subst. unfold aeval in H15.
+                             unfold beval in H15. simpl in H15.
+                             exfalso. discriminate.
+                      ------ (* guard false but continuation *)
+                             subst.
+                             inversion H6.
+                             subst. unfold aeval in H18.
+                             simpl in H18.
+                             exfalso. discriminate.
            ---- (* guard fails and there's no continuation *)
-                 rewrite <- H27 in H15.
-                 inversion H15.
+                subst.
+                inversion H27.
        --- (* chose right *)
-            inversion H16.
-            inversion H8.
-            ---- (* guard succeds - true *)
-                 inversion H32.
-           ---- (* guard fails and there's continuation *)
-                rewrite <- H21 in H22.
-                rewrite <- H22 in H26.
-                unfold beval in H26. unfold aeval in H26. simpl in H26.
-                exfalso. discriminate.
-           ---- (* guard fails and there's no continuation *)
-                rewrite <- H21 in H22.
-                rewrite <- H22 in H28.
-                unfold beval in H28. unfold aeval in H28. simpl in H28.
-                exfalso. discriminate.
-    -- (* use seq_choice_suc_L *)
-       inversion H3.
-       inversion H10.
-       --- (* guard succeds - false *)
-           rewrite <- H16 in H20.
-           rewrite <- H15 in H20.
-           unfold beval in H20. unfold aeval in H20. simpl in H20.
-           exfalso. discriminate.
-       --- (* guard fails and there's continuation - this is the case*)
-           exists q'.
-           destruct result0.
-           ---- (* success - this is the case *)
-                rewrite H9 in H21.
-                inversion H21.
-                rewrite <- H30 in H27.
-                inversion H27.
-                inversion H33.
-                inversion H36.
-                ----- (* guard succeded - this is the case *)
-                      inversion H54.
-                      rewrite <- H59.
-                      rewrite <- H44.
-                      rewrite <- H43.
-                      unfold aeval.
-                      apply E_Asgn.
-                      unfold aeval.
-                      trivial.
-                ----- (* guard failed - this is not the case *)
-                      rewrite <- H44 in H48.
-                      rewrite <- H43 in H48.
-                      unfold aeval in H48.
-                      unfold beval in H48.
-                      simpl in H48.
-                      exfalso. discriminate.
-           ---- (* failure - didn't happen *)
-                rewrite H9 in H21.
-                inversion H21.
-                rewrite <- H30 in H27.
-                inversion H27.
-                ----- (* first command failed *)
-                      inversion H35.
-                ----- (* second command failed *)
-                      inversion H33.
-                      inversion H36.
-                      ------ (* guard succeded - this is the case *)
-                             inversion H54.
-                      ------ (* guard failed and there's continuation - this is not the case *)
-                             rewrite <- H44 in H48.
-                             rewrite <- H43 in H48.
-                             unfold beval in H48. unfold aeval in H48.
-                             simpl in H48.
-                             exfalso. discriminate.
-                      ------ (* guard failed and there's no continuation - this is not the case *)
-                             rewrite <- H44 in H50.
-                             rewrite <- H43 in H50.
-                             unfold beval in H50. unfold aeval in H50.
-                             simpl in H50.
-                             exfalso. discriminate.
-       --- (* guard fails and there's no continuation - this is not the case*)
-           rewrite <- H21 in H9.
-           inversion H9.
-    -- (* use seq_choice_suc_R *)
-       inversion H3.
-       inversion H10.
-       --- (* guard passed - what happened *)
-            inversion H26. 
-            exists q'.
-            rewrite H17 in H3.
-            rewrite <- H31.
-            assumption.
-       --- (* guard failed - did not happen *)
-           rewrite <- H16 in H20.
-           rewrite <- H15 in H20.
-           unfold aeval in H20. unfold beval in H20. simpl in H20.
-           exfalso. discriminate.
-       --- rewrite <- H16 in H25.
-           rewrite <- H15 in H25.
-           unfold aeval in H25. unfold beval in H25. simpl in H25.
-           exfalso. discriminate.
-    -- (* use seq_choice_fail_R *)
-       inversion H8.
-    -- (* use seq_choice_fail_L *)
-       inversion H8.
+           inversion H16. inversion H8. subst.
+           ---- (* guard succeds - true *)
+                inversion H32.
+           ---- (* guard fails but continuation - false *)
+                subst.
+                simpl in H26. exfalso. discriminate.
+           ---- (* guard fails with not continuation - false *)
+                subst.
+                simpl in H28. exfalso. discriminate.
   - unfold cequiv_imp. intros.
     inversion H.
-    exists q2.
-    apply E_Choice_Seq_Suc_L with (st' := (X !-> 1; st1)) (q' := q2)
-      (q'' := (st1, <{ X := 2; X=2 -> skip }>) :: q2).
-    -- (* prove c1 *)
+    eexists.
+    eapply E_Seq_Suc.
+    -- (* prove left *)
+       eapply E_Choice_R.
        apply E_Asgn.
        unfold aeval. trivial.
-    -- (* prove continuations match *)
-       trivial.
-    -- (* prove execution of right with new continuation *)
-       apply E_Guard_Backtrack with (st' := st1) (c' := <{ X := 2; X=2 -> skip }>) (q' := q2).
-       --- (* prove guard is false to be able to backtrack *)
-           unfold beval. simpl. trivial.
-       --- (* prove continuations match *)
-           trivial.
-       --- (* prove that execution of continuation gives desired result *)
-           apply E_Seq_Suc with (st' := X !-> 2; st1) (q' := q2).
-           ---- apply E_Asgn. unfold aeval. trivial.
-           ---- apply E_Guard_True.
-                ----- unfold beval. simpl. trivial.
-                ----- rewrite <- H7. unfold aeval. apply E_Skip.
+    -- (* prove right *)
+      apply E_Guard_True.
+       --- (* prove guard true *)
+           simpl. trivial.
+       --- (* prove body *)
+           subst. 
+           apply E_Skip.
 Qed.
 
 Lemma choice_idempotent: forall c,
@@ -673,24 +570,54 @@ Proof.
                 assumption.
            ---- (* second fails *)
                 assumption.
-    -- (* (c0 !! c4); (c2 !! c3) *)
-       (* (((c0 !! c4); c2) !! ((c0 !! c4); c3)) *)
-       (* chose left - c0 *)
-       inversion H9.
-       --- (* chose left - c2 *)
-           exists ((st1, <{ c0 !! c4 ; c3 }>)::q1).
-           apply E_Choice_L with (q' := (st1, <{ (c0 !! c4); c3}>)::q1) (st' := st2).
-           apply E_Choice_Seq_Suc_L with (st' := st') (q' := q')
-            (q'' := (st1, <{ c0 !! c4; c2 }>)::q1).
-           ---- (* prove left *)
-                assumption.
-           ---- (* continuity matches *)
-                trivial.
-Admitted.
-
-
-  (* TODO *)
-(* Qed. *)
+  - unfold cequiv_imp. intros.
+    inversion H.
+    -- (* chose left *)
+       inversion H7.
+       --- (* success *)
+           eexists.
+           eapply E_Seq_Suc.
+           ---- (* left *)
+                eassumption.
+           ---- (* right *)
+                eapply E_Choice_L.
+                eassumption.
+       --- (* first failed *)
+           eexists.
+           eapply E_Seq_Fail_1.
+           eassumption.
+       --- (* second failed *)
+           eexists.
+           eapply E_Seq_Fail_2.
+           ---- (* first succeded *)
+                eassumption.
+           ---- (* second failed *)
+                eapply E_Choice_L.
+                eassumption.
+    -- (* chose right *)
+       inversion H7.
+       --- (* success *)
+           eexists.
+           eapply E_Seq_Suc.
+           ---- (* left *)
+                eassumption.
+           ---- (* right *)
+                eapply E_Choice_R.
+                eassumption.
+       --- (* first failed *)
+           eexists.
+           eapply E_Seq_Fail_1.
+           eassumption.
+       --- (* second failed *)
+           eexists.
+           eapply E_Seq_Fail_2.
+           ---- (* first succeded *)
+                eassumption.
+           ---- (* second failed *)
+                eapply E_Choice_R.
+                eassumption.
+Unshelve. trivial. trivial. trivial. trivial.
+Qed.
 
 Lemma choice_congruence: forall c1 c1' c2 c2',
 c1 == c1' -> c2 == c2' ->
