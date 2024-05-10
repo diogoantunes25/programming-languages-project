@@ -14,7 +14,6 @@ Inductive interpreter_result : Type :=
     bit of auxiliary notation to hide the plumbing involved in
     repeatedly matching against optional states. *)
 
-
 Notation "'LetSuc' ( st , cont ) '<==' e1 'in' e2"
   := (match e1 with
           | Success (st,cont) => e2
@@ -128,10 +127,6 @@ Example test_11:
   = OK [("X", 0); ("Y", 5); ("Z", 0)].
 Proof. auto. Qed.
 
-(**
-  2.2. TODO: Prove p1_equals_p2. Recall that p1 and p2 are defined in Imp.v
-*)
-
 (* The interpreter result of p1 and p2 is the same, i.e, it returns for both cases Success (X !-> 2; st, cont), if and only if in the 
 non-deterministic operator (c1 !! c2) we first choose c1 *)
 
@@ -142,10 +137,6 @@ Proof.
   intros st cont. exists 5. intros.
   do 6 (destruct i1; try lia; auto).
 Qed.
-
-(**
-  2.3. TODO: Prove ceval_step_more.
-*)
 
 (* For all i1 and i2 such that the interpreter result of ceval_step st c cont i1 is Success(st', cont) and i1 <= i2, then the interpreter result 
 of ceval_step st c cont i2 is also Success(st', cont). *)
@@ -161,93 +152,59 @@ Proof.
     -- destruct i2 as [|i2'] eqn:Ei2.
        --- lia.
        --- assert (Hle: i1 <= i2') by lia. 
-           destruct c.
-           (* skip *)
-           ---- trivial.
-           (* x := a *)
-           ---- trivial.
+           destruct c; trivial.
            (* c1;c2 *)
-           ---- destruct c1.
-                ----- simpl. simpl in H0.
-                      (* i want to apply IHi1, for that I need to show that is
+           ---- destruct c1; simpl; simpl in H0.
+                ----- (* i want to apply IHi1, for that I need to show that is
                       a success *)
-                      destruct (ceval_step st _ cont i1) eqn:Eceval.
+                      destruct (ceval_step st _ cont i1) eqn:Eceval; try discriminate.
                       ------ destruct s. apply (IHi1 i2') in Eceval. rewrite Eceval.
                              apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                      ------ discriminate.
-                      ------ discriminate.
-                ----- simpl. simpl in H0.
-                      destruct (ceval_step st <{ x := a }> cont i1) eqn:Eceval.
+                ----- destruct (ceval_step st <{ x := a }> cont i1) eqn:Eceval; try discriminate.
                       ------ destruct s. apply (IHi1 i2') in Eceval. rewrite Eceval.
                              apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                      ------ discriminate.
-                      ------ discriminate.
-                ----- simpl. simpl in H0.
-                      destruct (ceval_step st <{ c1_1; c1_2 }> cont i1) eqn:Eceval.
+                ----- destruct (ceval_step st <{ c1_1; c1_2 }> cont i1) eqn:Eceval; try discriminate.
+
                       ------ destruct s. apply (IHi1 i2') in Eceval. rewrite Eceval.
                              apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                      ------ discriminate.
-                      ------ discriminate.
-                ----- simpl. simpl in H0.
-                      destruct (ceval_step st <{ if b then c1_1 else c1_2 end }> cont i1) eqn:Eceval.
+                ----- destruct (ceval_step st <{ if b then c1_1 else c1_2 end }> cont i1) eqn:Eceval; try discriminate.
                       ------ destruct s. apply (IHi1 i2') in Eceval. rewrite Eceval.
                              apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                      ------ discriminate.
-                      ------ discriminate.
-                ----- simpl. simpl in H0.
-                      destruct (ceval_step st <{ while b do c1 end }> cont i1) eqn:Eceval.
+                ----- destruct (ceval_step st <{ while b do c1 end }> cont i1) eqn:Eceval; try discriminate.
                       ------ destruct s. apply (IHi1 i2') in Eceval. rewrite Eceval.
                              apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                      ------ discriminate.
-                      ------ discriminate.
-                ----- simpl. simpl in H0. 
-                      destruct (ceval_step st <{ c1_1 !! c1_2; c2 }> cont i1) eqn:Eceval.
+                ----- destruct (ceval_step st <{ c1_1 !! c1_2; c2 }> cont i1) eqn:Eceval.
                       ------ destruct s. apply (IHi1 i2') in Eceval.
-                             destruct (ceval_step st c1_1 cont i1) eqn:Eceval2.
+                             destruct (ceval_step st c1_1 cont i1) eqn:Eceval2; try discriminate.
                              ------- destruct s0. apply (IHi1 i2') in Eceval2. rewrite Eceval2.
-                                     apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                             ------- discriminate.
-                             ------- discriminate.
+                                     apply (IHi1 i2') in H0; assumption. assumption .
                              ------- assumption.
-                      ------ destruct (ceval_step st c1_1 cont i1) eqn:Eceval2.
+                      ------ destruct (ceval_step st c1_1 cont i1) eqn:Eceval2; try discriminate.
                              ------- destruct s. apply (IHi1 i2') in Eceval2. rewrite Eceval2.
                                      apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                             ------- discriminate.
-                             ------- discriminate.
-                      ------ destruct (ceval_step st c1_1 cont i1) eqn:Eceval2.
+                      ------ destruct (ceval_step st c1_1 cont i1) eqn:Eceval2; try discriminate.
                              ------- destruct s. apply (IHi1 i2') in Eceval2. rewrite Eceval2.
                                      apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                             ------- discriminate.
-                             ------- discriminate.
-                ----- simpl. simpl in H0.
-                      destruct (ceval_step st <{ b -> c1 }> cont i1) eqn:Eceval.
+                ----- destruct (ceval_step st <{ b -> c1 }> cont i1) eqn:Eceval; try discriminate.
                       ------ destruct s. apply (IHi1 i2') in Eceval. rewrite Eceval.
                              apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                      ------ discriminate.
-                      ------ discriminate.
            (* if b then c1 else c2 end *)
-           ---- simpl. destruct (beval st b) eqn: Ebeval.
-                ----- apply IHi1. assumption. simpl in H0. rewrite Ebeval in H0. assumption.
-                ----- apply IHi1. assumption. simpl in H0. rewrite Ebeval in H0. assumption.
+           ---- simpl. destruct (beval st b) eqn: Ebeval;
+                apply IHi1; try assumption; simpl in H0; rewrite Ebeval in H0; assumption.
+
            (* while b do c end *)
            ---- simpl. simpl in H0. destruct (beval st b) eqn: Ebeval.
-                (* TODO: understand why destruct of function worked, but not the explicit call *)
-                ----- destruct ceval_step eqn: Eceval.
+                ----- destruct ceval_step eqn: Eceval; try discriminate.
                       ------ destruct s. apply (IHi1 i2') in Eceval. rewrite Eceval.
-                             apply (IHi1 i2') in H0. assumption. assumption. assumption.
-                      ------ discriminate.
-                      ------ discriminate.
+                             apply (IHi1 i2') in H0; assumption. assumption.
                 ----- assumption.
           (* c1 !! c2 *)
-           ---- simpl. simpl in H0. destruct ceval_step eqn: Eceval.
+           ---- simpl. simpl in H0. destruct ceval_step eqn: Eceval; try discriminate.
                 (* First command succeded *)
                 ----- destruct s. apply (IHi1 i2') in Eceval. rewrite Eceval. assumption. assumption.
-                (* First command failed/ran out of gas *)
-                ----- discriminate.
-                ----- discriminate.
            ---- simpl. simpl in H0. destruct (beval st b).
-                ----- apply (IHi1 i2') in H0. assumption. assumption.
+                ----- apply (IHi1 i2') in H0; assumption.
                 ----- destruct cont.
                       ------ discriminate.
-                      ------ destruct p. apply (IHi1 i2') in H0. assumption. assumption.
+                      ------ destruct p. apply (IHi1 i2') in H0; assumption.
 Qed.

@@ -38,13 +38,17 @@ Inductive ceval : com -> state -> list (state * com) ->
 | E_Asgn: forall st q a n x,
     aeval st a = n -> 
     st / q =[ x := a ]=> (x !-> n; st) / q / Success
-| E_Seq_Suc: forall st st' st'' q q' q'' c1 c2 r,
+| E_Seq_Suc: forall st st' st'' q q' q'' c1 c2,
     st / q =[ c1 ]=> st' / q' / Success ->
-    st' / q' =[ c2 ]=> st'' / q'' / r ->
-    st / q =[ c1;c2 ]=> st'' / q'' / r
+    st' / q' =[ c2 ]=> st'' / q'' / Success ->
+    st / q =[ c1;c2 ]=> st'' / q'' / Success
 | E_Seq_Fail_1: forall st st' st'' q q' q'' c1 c2,
     st / q =[ c1 ]=> st' / q' / Fail ->
     st / q =[ c1;c2 ]=> st'' / q'' / Fail
+| E_Seq_Fail_2: forall st st' st'' st''' q q' q'' q''' c1 c2,
+    st / q =[ c1 ]=> st' / q' / Success ->
+    st' / q' =[ c2 ]=> st'' / q'' / Fail ->
+    st / q =[ c1;c2 ]=> st''' / q''' / Fail
 | E_If_True: forall st st' b q q' c1 c2 r,
     beval st b = true  ->
     st / q =[ c1 ]=> st' / q' / r ->
@@ -154,11 +158,7 @@ Proof.
     apply E_Choice_L with (q' := []).
     apply E_Asgn. trivial.
   - (* right part *)
-    apply E_Guard_Backtrack with (st' := empty_st) (q' := []) (c' := <{X:=2}>).
-    -- (* prove guard false *)
-       trivial.
-    -- (* prove continuations match *)
-       trivial.
+    apply E_Guard_Backtrack with (st' := empty_st) (q' := []) (c' := <{X:=2}>); trivial.
     -- apply E_Seq_Suc with (st' := (X !-> 2)) (q' := []).
        --- (* left part *)
            apply E_Asgn. trivial.
@@ -466,7 +466,6 @@ Proof.
     inversion H.
     -- (* chose left - c1 !! c2 *)
        inversion H7.
-       (* TODO: understand this properly, this was some kind of wizardry *)
        --- (* chose left c1 *)
            (* recall that q' is the continuation that comes out of evaulating
               the chosen side *)
@@ -597,7 +596,8 @@ Proof.
            ---- (* second failed *)
                 eapply E_Choice_R.
                 eassumption.
-Unshelve. trivial. trivial. trivial. trivial.
+    Unshelve.
+    all: trivial.
 Qed.
 
 Lemma choice_congruence: forall c1 c1' c2 c2',
@@ -605,9 +605,8 @@ c1 == c1' -> c2 == c2' ->
 <{ c1 !! c2 }> == <{ c1' !! c2' }>.
 Proof.
     intros.
-    unfold cequiv. split.
-    - unfold cequiv_imp. intros.
-      inversion H1.
+    unfold cequiv. split; unfold cequiv_imp; intros. 
+    - inversion H1.
       -- (* chose left *)
          unfold cequiv in H. destruct H as [Hl Hr].
 
@@ -628,8 +627,7 @@ Proof.
          exists ((st1, c1')::q1).
          apply E_Choice_R with (q' := q4).
          trivial.
-    - unfold cequiv_imp. intros.
-      inversion H1.
+    - inversion H1.
       -- (* chose left *)
          unfold cequiv in H. destruct H as [Hl Hr].
 
