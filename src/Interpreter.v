@@ -23,13 +23,6 @@ Inductive result : Type :=
     repeatedly matching against optional states. *)
 
 
-Notation "'try-ceval' st i' cont"
-  := (match cont with
-          | [] => Success(st, i')
-          | h::t => ceval_step st h i' t
-       end)
-(right associativity, at level 60).
- 
 (* Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i : nat) *)
 (*                     : interpreter_result := *)
 
@@ -142,57 +135,6 @@ Compute (run_interpreter (X !-> 0; Y !-> 0) <{
   Y = 2 -> Z := Z + 1
 }> 100).
 
-
-(* Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i : nat) *)
-(*                     : interpreter_result := *)
-(*   match i with *)
-(*   | O => OutOfGas *)
-(*   | S i' => match c with *)
-(*     | <{ skip }> => Success (st, continuation) *)
-(*     | <{ x := y }> => Success ((x !-> aeval st y; st), continuation) *)
-(*     | <{ (c1 !! c2) ; c3 }> => *)
-(*       LetSuc ( st' , cont' ) <== (ceval_step st c1 continuation i') in *)
-(*         (ceval_step st' c3 ((st, <{ c2; c3 }>)::cont') i') *)
-(*     | <{ c1 ; c2 }> => *)
-(*       LetSuc (st', cont') <== (ceval_step st c1 continuation i') in *)
-(*         (ceval_step st' c2 cont' i') *)
-(*     | <{ if b then c1 else c2 end }> => *)
-(*       if (beval st b) *)
-(*       then ceval_step st c1 continuation i' *)
-(*       else ceval_step st c2 continuation i' *)
-(*     | <{ while b do c1 end }> => *)
-(*       if (beval st b) *)
-(*       then LetSuc (st', cont') <== (ceval_step st c1 continuation i') in *)
-(*         (ceval_step st' c cont' i') *)
-(*       else Success (st,continuation) *)
-(*     | <{ c1 !! c2 }> => *)
-(*       (* c1 is executed first *) *)
-(*         LetSuc (st', cont') <== (ceval_step st c1 continuation i') in *)
-(*           Success (st', (st, c2) :: cont') *)
-(*     | <{ b -> c1 }> => *)
-(*       if beval st b *)
-(*       then ceval_step st c1 continuation i' *)
-(*       else *)
-(*         match continuation with *)
-(*         | [] => Fail    *)
-(*         | (st', c') :: cont' => ceval_step st' c' cont' i'  *)
-(*         end *)
-(*     end *)
-(*   end. *)
-(**)
-(* Helper functions that help with running the interpreter *)
-(* Inductive show_result : Type := *)
-(*   | OK (st: list (string*nat)) *)
-(*   | KO *)
-(*   | OOG. *)
-(**)
-(* Definition run_interpreter (st: state) (c:com) (n:nat) := *)
-(*   match (ceval_step st c [] n) with *)
-(*     | OutOfGas => OOG *)
-(*     | Fail => KO *)
-(*     | Success (st', _) => OK [("X", st' X); ("Y", st' Y); ("Z", st' Z)] *)
-(*   end. *)
-(**)
 (* Tests are provided to ensure that your interpreter is working for these examples *)
 
 Example test_dsa_1:
@@ -402,7 +344,7 @@ Proof.
                       destruct i' as [|i''].
                       ------ simpl in H. discriminate.
                       ------ simpl in H. subst.
-                             (* coq doesn't use full induction, but it's what is needed the following hypothesis is added to simulate what full induction would do. clearly, the following statement is true (it's H with S i'' replaced by i'') *)
+                             (* coq doesn't use strong induction, but it's what is needed the following hypothesis is added to simulate what full induction would do. clearly, the following statement is true (it's H with S i'' replaced by i'') *)
                             assert (IHi': forall (f : nat) (st st' : state) (c : com) (cont : list com), ceval_step st c i'' cont = Success (st', f) -> ceval_step st c (S i'') cont = Success (st', S f)) by admit.
                             apply IHi' in H.
                             trivial.
@@ -417,7 +359,7 @@ Proof.
                 destruct i' as [|i''].
                       ------ simpl in H. discriminate.
                       ------ simpl in H. subst.
-                             (* coq doesn't use full induction, but it's what is needed the following hypothesis is added to simulate what full induction would do. clearly, the following statement is true (it's H with S i'' replaced by i'') *)
+                             (* coq doesn't use strong induction, but it's what is needed the following hypothesis is added to simulate what full induction would do. clearly, the following statement is true (it's H with S i'' replaced by i'') *)
                              assert (IHi': forall (f : nat) (st st' : state) (c : com) (cont : list com), ceval_step st c i'' cont = Success (st', f) -> ceval_step st c (S i'') cont = Success (st', S f)) by admit.
                              apply IHi' in H.
                              trivial. 
@@ -435,7 +377,7 @@ Proof.
                       destruct i' as [|i''].
                       ------ simpl in H. discriminate.
                       ------ simpl in H. subst.
-                             (* coq doesn't use full induction, but it's what is needed the following hypothesis is added to simulate what full induction would do. clearly, the following statement is true (it's H with S i'' replaced by i'') *)
+                             (* coq doesn't use strong induction, but it's what is needed the following hypothesis is added to simulate what strong induction would do. clearly, the following statement is true (it's H with S i'' replaced by i'') *)
                             assert (IHi': forall (f : nat) (st st' : state) (c : com) (cont : list com),
                               (ceval_step st c (i'') cont = Success (st', f) ->
                                ceval_step st c (S i'') cont = Success (st', S f)) /\
@@ -454,7 +396,7 @@ Proof.
                 destruct i' as [|i''].
                       ------ simpl in H. discriminate.
                       ------ simpl in H. subst.
-                             (* coq doesn't use full induction, but it's what is needed the following hypothesis is added to simulate what full induction would do. clearly, the following statement is true (it's H with S i'' replaced by i'') *)
+                             (* coq doesn't use strong induction, but it's what is needed the following hypothesis is added to simulate what strong induction would do. clearly, the following statement is true (it's H with S i'' replaced by i'') *)
                              assert (IHi': forall (f : nat) (st st' : state) (c : com) (cont : list com),
                               (ceval_step st c (i'') cont = Success (st', f) ->
                                ceval_step st c (S i'') cont = Success (st', S f)) /\
@@ -527,7 +469,9 @@ Proof.
                 destruct (beval st b) eqn:Ebeval.
                 ----- apply IHi; trivial.
                 ----- trivial.
-Admitted. (* only things admitted are the ones required for strong induction *)
+(* only things admitted are the ones required for strong induction,
+   besides that everything was proven *)
+Admitted. 
 
 Lemma ceval_step_one_more: forall i f st st' c,
   ceval_step_main st c i = Success (st', f) ->
