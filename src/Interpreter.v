@@ -6,7 +6,8 @@ From FirstProject Require Import Imp Maps.
 
 
 Inductive interpreter_result : Type :=
-  | Success (s: state * (list (state*com)))
+  (* final state, final continuation, number of steps remaining *)
+  | Success (s: state * (list (state*com)) * nat) 
   | Fail
   | OutOfGas.
 
@@ -17,7 +18,7 @@ Inductive interpreter_result : Type :=
 
 Notation "'LetSuc' ( st , cont ) '<==' e1 'in' e2"
   := (match e1 with
-          | Success (st,cont) => e2
+          | Success (st,cont,i) => e2
           | Fail => Fail
           | OutOfGas => OutOfGas
        end)
@@ -29,10 +30,10 @@ Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i
   match i with
   | O => OutOfGas
   | S i' => match c with
-    | <{ skip }> => Success (st, continuation)
-    | <{ x := y }> => Success ((x !-> aeval st y; st), continuation)
+    | <{ skip }> => Success (st, continuation, i')
+    | <{ x := y }> => Success ((x !-> aeval st y; st), continuation, i')
     | <{ (c1 !! c2) ; c3 }> =>
-      LetSuc ( st' , cont' ) <== (ceval_step st c1 continuation i') in
+      LetSuc ( st' , cont') <== (ceval_step st c1 continuation i') in
         (ceval_step st' c3 ((st, <{ c2; c3 }>)::cont') i')
     | <{ c1 ; c2 }> =>
       LetSuc (st', cont') <== (ceval_step st c1 continuation i') in
@@ -45,11 +46,11 @@ Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i
       if (beval st b)
       then LetSuc (st', cont') <== (ceval_step st c1 continuation i') in
         (ceval_step st' c cont' i')
-      else Success (st,continuation)
+      else Success (st,continuation, i')
     | <{ c1 !! c2 }> =>
       (* c1 is executed first *)
         LetSuc (st', cont') <== (ceval_step st c1 continuation i') in
-          Success (st', (st, c2) :: cont')
+          Success (st', (st, c2) :: cont', i')
     | <{ b -> c1 }> =>
       if beval st b
       then ceval_step st c1 continuation i'
@@ -63,7 +64,7 @@ Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i
 
 (* Helper functions that help with running the interpreter *)
 Inductive show_result : Type :=
-  | OK (st: list (string*nat))
+  | OK (st: ((list (string*nat)) * nat))
   | KO
   | OOG.
 
@@ -72,7 +73,7 @@ Definition run_interpreter (st: state) (c:com) (n:nat) :=
   match (ceval_step st c [] n) with
     | OutOfGas => OOG
     | Fail => KO
-    | Success (st', _) => OK [("X", st' X); ("Y", st' Y); ("Z", st' Z)]
+    | Success (st', _, i) => OK ([("X", st' X); ("Y", st' Y); ("Z", st' Z)], (n - i))
   end.
 
 (* Tests are provided to ensure that your interpreter is working for these examples *)
