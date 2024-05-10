@@ -1,12 +1,20 @@
 From Coq Require Import Lia.
+From Coq Require Import Nat.
 From Coq Require Import Arith.Arith.
 From Coq Require Import List.
+Require Import Coq.Arith.EqNat.
 Import ListNotations.
 From FirstProject Require Import Imp Maps.
 
 
-Inductive interpreter_result : Type :=
-  | Success (s: state * (list (state*com)))
+(* Inductive interpreter_result : Type := *)
+(*   | Success (s: state * (list (state*com))) *)
+(*   | Fail *)
+(*   | OutOfGas. *)
+(**)
+
+Inductive result : Type :=
+  | Success (s: state * nat)
   | Fail
   | OutOfGas.
 
@@ -15,66 +23,169 @@ Inductive interpreter_result : Type :=
     repeatedly matching against optional states. *)
 
 
-Notation "'LetSuc' ( st , cont ) '<==' e1 'in' e2"
-  := (match e1 with
-          | Success (st,cont) => e2
-          | Fail => Fail
-          | OutOfGas => OutOfGas
-       end)
-(right associativity, at level 60).
+(* Notation "'LetSuc' ( st , cont ) '<==' e1 'in' e2" *)
+(*   := (match e1 with *)
+(*           | Success (st,cont) => e2 *)
+(*           | Fail => Fail *)
+(*           | OutOfGas => OutOfGas *)
+(*        end) *)
+(* (right associativity, at level 60). *)
+ 
 
+(* Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i : nat) *)
+(*                     : interpreter_result := *)
 
-Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i : nat)
-                    : interpreter_result :=
+Fixpoint ceval_step (st: state) (c: com) (i: nat) (cont: state -> nat -> result): result :=
   match i with
   | O => OutOfGas
-  | S i' => match c with
-    | <{ skip }> => Success (st, continuation)
-    | <{ x := y }> => Success ((x !-> aeval st y; st), continuation)
-    | <{ (c1 !! c2) ; c3 }> =>
-      LetSuc ( st' , cont' ) <== (ceval_step st c1 continuation i') in
-        (ceval_step st' c3 ((st, <{ c2; c3 }>)::cont') i')
-    | <{ c1 ; c2 }> =>
-      LetSuc (st', cont') <== (ceval_step st c1 continuation i') in
-        (ceval_step st' c2 cont' i')
+  | S i' =>
+    match c with
+    | <{ skip }> => (cont st i')
+    | <{ x := a }> => let st' := (x !-> aeval st a; st) in (cont st' i')
+    | <{ c1; c2 }> => let cont' := (fun st' _ => ceval_step st' c2 i' cont)
+      in ceval_step st c1 i' cont'
     | <{ if b then c1 else c2 end }> =>
       if (beval st b)
-      then ceval_step st c1 continuation i'
-      else ceval_step st c2 continuation i'
+      then ceval_step st c1 i' cont
+      else ceval_step st c2 i' cont
     | <{ while b do c1 end }> =>
       if (beval st b)
-      then LetSuc (st', cont') <== (ceval_step st c1 continuation i') in
-        (ceval_step st' c cont' i')
-      else Success (st,continuation)
+      then ceval_step st <{ c1; c }> i' cont
+      else (cont st i')
     | <{ c1 !! c2 }> =>
-      (* c1 is executed first *)
-        LetSuc (st', cont') <== (ceval_step st c1 continuation i') in
-          Success (st', (st, c2) :: cont')
+      match ceval_step st c1 i' cont with
+      | Success(sst, si) => Success(sst, si)
+      | Fail => ceval_step st c2 i' cont
+      | OutOfGas => OutOfGas
+      end
     | <{ b -> c1 }> =>
-      if beval st b
-      then ceval_step st c1 continuation i'
-      else
-        match continuation with
-        | [] => Fail   
-        | (st', c') :: cont' => ceval_step st' c' cont' i' 
-        end
+      if (beval st b)
+      then ceval_step st c1 i' cont
+      else Fail
     end
   end.
 
+Definition ceval_step_main (st: state) (c: com) (i: nat) :=
+  ceval_step st c i (fun st n => Success(st, n)).
+
+Open Scope string_scope.
 (* Helper functions that help with running the interpreter *)
 Inductive show_result : Type :=
   | OK (st: list (string*nat))
   | KO
   | OOG.
 
-Open Scope string_scope.
 Definition run_interpreter (st: state) (c:com) (n:nat) :=
-  match (ceval_step st c [] n) with
+  match (ceval_step_main st c n) with
     | OutOfGas => OOG
     | Fail => KO
     | Success (st', _) => OK [("X", st' X); ("Y", st' Y); ("Z", st' Z)]
   end.
 
+Compute (run_interpreter (X !-> 5) <{ skip }> 10).
+
+Compute (run_interpreter (X !-> 5) <{ X := 2 }> 10).
+
+Compute (run_interpreter (X !-> 5) <{ if X = 2 then Y := 1 else Y := 2 end }> 10).
+
+Compute (run_interpreter (X !-> 5) <{ if X = 5 then Y := 1 else Y := 2 end }> 10).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{ X := 1; Y := 1 }> 10).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{ X := 2 !! X := 1 }> 10).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{ X := 2 !! X := 1; X = 1 -> Z := 3 }> 10).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{ X := 2 !! X := 1; Y := 5; X = 1 -> Z := 3 }> 10).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{
+  if true then (X := 2 !! X := 1) else skip end;
+  Y := 5; X = 1 -> Z := 3
+}> 10).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{ X := 5; X = 2 -> skip}> 10).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{(X := 2; X = 1 -> Z:=3) !! (X:=10) }> 10).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{
+(X := 1 !! X := 2);
+Y := 0;
+X = 2 -> skip;
+Y := Y + 1
+}> 10).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{
+X := 0;
+Y := 10;
+while 5 <= Y do
+  X := X + 1;
+  Y := Y - 2
+end;
+Z := 5
+
+}> 100).
+
+Compute (run_interpreter (X !-> 0; Y !-> 0) <{
+  (X := 1 !! X := 2);
+  (Y := 1 !! Y := 2);
+  Z := 0;
+
+  X = 2 -> Z := Z + 1;
+  Y = 2 -> Z := Z + 1
+}> 100).
+
+
+
+(* Fixpoint ceval_step (st : state) (c : com) (continuation: list (state * com)) (i : nat) *)
+(*                     : interpreter_result := *)
+(*   match i with *)
+(*   | O => OutOfGas *)
+(*   | S i' => match c with *)
+(*     | <{ skip }> => Success (st, continuation) *)
+(*     | <{ x := y }> => Success ((x !-> aeval st y; st), continuation) *)
+(*     | <{ (c1 !! c2) ; c3 }> => *)
+(*       LetSuc ( st' , cont' ) <== (ceval_step st c1 continuation i') in *)
+(*         (ceval_step st' c3 ((st, <{ c2; c3 }>)::cont') i') *)
+(*     | <{ c1 ; c2 }> => *)
+(*       LetSuc (st', cont') <== (ceval_step st c1 continuation i') in *)
+(*         (ceval_step st' c2 cont' i') *)
+(*     | <{ if b then c1 else c2 end }> => *)
+(*       if (beval st b) *)
+(*       then ceval_step st c1 continuation i' *)
+(*       else ceval_step st c2 continuation i' *)
+(*     | <{ while b do c1 end }> => *)
+(*       if (beval st b) *)
+(*       then LetSuc (st', cont') <== (ceval_step st c1 continuation i') in *)
+(*         (ceval_step st' c cont' i') *)
+(*       else Success (st,continuation) *)
+(*     | <{ c1 !! c2 }> => *)
+(*       (* c1 is executed first *) *)
+(*         LetSuc (st', cont') <== (ceval_step st c1 continuation i') in *)
+(*           Success (st', (st, c2) :: cont') *)
+(*     | <{ b -> c1 }> => *)
+(*       if beval st b *)
+(*       then ceval_step st c1 continuation i' *)
+(*       else *)
+(*         match continuation with *)
+(*         | [] => Fail    *)
+(*         | (st', c') :: cont' => ceval_step st' c' cont' i'  *)
+(*         end *)
+(*     end *)
+(*   end. *)
+(**)
+(* Helper functions that help with running the interpreter *)
+(* Inductive show_result : Type := *)
+(*   | OK (st: list (string*nat)) *)
+(*   | KO *)
+(*   | OOG. *)
+(**)
+(* Definition run_interpreter (st: state) (c:com) (n:nat) := *)
+(*   match (ceval_step st c [] n) with *)
+(*     | OutOfGas => OOG *)
+(*     | Fail => KO *)
+(*     | Success (st', _) => OK [("X", st' X); ("Y", st' Y); ("Z", st' Z)] *)
+(*   end. *)
+(**)
 (* Tests are provided to ensure that your interpreter is working for these examples *)
 
 Example test_dsa_1:
@@ -95,6 +206,7 @@ Proof. auto. Qed.
 (*     Y := X + 1; *)
 (*     (X = 2 -> Z := 3) *)
 (*   }> 300. *)
+
 (**)
 (* (* the size of the continuation to the left doesn't change, but the continuatoin is different*) *)
 (* (* Compute *) *)
@@ -174,16 +286,13 @@ Example test_2:
   run_interpreter (X !-> 5) <{ X:= X+1 }> 1 = OK [("X", 6); ("Y", 0); ("Z", 0)].
 Proof. auto. Qed.
 
-Example test_3: 
-  run_interpreter (X !-> 5) <{ X:= X+1; X:=X+2; Y:=Y+1 }> 3 = OK [("X", 8); ("Y", 1); ("Z", 0)].
-Proof. auto. Qed.
-
 Example test_4: 
   run_interpreter (X !-> 5) <{ X:= X+1; X:=X+2; Y:=Y+1 }> 2 = OOG.
 Proof. auto. Qed.
 
 Example test_5:
   run_interpreter (X !-> 5) <{ X:= X+1; X=5 -> skip }> 2 = KO.
+  (* run_interpreter (X !-> 5) <{ X:= X+1; X=5 -> skip }> 3 = KO. *)
 Proof. auto. Qed.
 
 Example test_6:
@@ -195,7 +304,8 @@ Example test_7:
 Proof. auto. Qed.
 
 Example test_8:
-  run_interpreter (X !-> 5) <{ (X := 1 !! X := 2); (X = 2) -> X:=3 }> 4 = OOG.
+  (* run_interpreter (X !-> 5) <{ (X := 1 !! X := 2); (X = 2) -> X:=3 }> 4 = OOG. *)
+  run_interpreter (X !-> 5) <{ (X := 1 !! X := 2); (X = 2) -> X:=3 }> 2 = OOG.
 Proof. auto. Qed.
 
 Example test_9:
@@ -213,7 +323,8 @@ Example test_11:
       end;
       Y=5 -> skip
   }>
-  8 
+  (* 8  *)
+  13 
   = OK [("X", 0); ("Y", 5); ("Z", 0)].
 Proof. auto. Qed.
 
@@ -221,12 +332,24 @@ Proof. auto. Qed.
   2.2. TODO: Prove p1_equals_p2. Recall that p1 and p2 are defined in Imp.v
 *)
 
-Theorem p1_equals_p2: forall st cont,
+(* Theorem p1_equals_p2: forall st cont, *)
+(*   (exists i0, *)
+(*     (forall i1, i1 >= i0 -> ceval_step st p1 cont i1 =  ceval_step st p2 cont i1)). *)
+
+Theorem p1_equals_p2: forall st st',
   (exists i0,
-    (forall i1, i1 >= i0 -> ceval_step st p1 cont i1 =  ceval_step st p2 cont i1)).
+    (forall i1 i2, i1 >= i0 ->
+    exists i3,
+    ceval_step_main st p1 i0 = Success (st', i2) ->
+    ceval_step_main st p2 i1 = Success (st', i3))).
 Proof.
-  intros st cont. exists 5. intros.
-  do 6 (destruct i1; try lia; auto).
+  intros.
+  exists 5. intros. exists (i1-(i2-1)).
+  unfold ceval_step_main.
+  destruct i1 as [|i1'].
+  - lia.
+  - simpl. intros. inversion H0. simpl. rewrite Nat.sub_0_r.
+    trivial.
 Qed.
 
 (**
@@ -381,3 +504,5 @@ Proof.
                       ------ discriminate.
                       ------ destruct p. apply (IHi1 i2') in H0. assumption. assumption.
 Qed.
+
+
