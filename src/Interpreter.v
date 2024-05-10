@@ -77,95 +77,6 @@ Definition run_interpreter (st: state) (c:com) (n:nat) :=
 
 (* Tests are provided to ensure that your interpreter is working for these examples *)
 
-Example test_dsa_1:
-  run_interpreter (X !-> 5) <{ X=5 -> X:=10 }> 5 = OK [("X", 10); ("Y", 0); ("Z", 0)].
-Proof. auto. Qed.
-
-Example test_dsa_2:
-  run_interpreter (X !-> 5) <{ X=5 -> X:=10 }> 5 = OK [("X", 10); ("Y", 0); ("Z", 0)].
-Proof. auto. Qed.
-
-Example test_dsa_3:
-  run_interpreter (X !-> 5) <{ X=10 -> X:=11 }> 5 = KO.
-Proof. auto. Qed.
-
-(* Compute *)
-(*   run_interpreter (X !-> 5) <{ *)
-(*     if true then (X := 1 !! X := 2) else skip end; *)
-(*     Y := X + 1; *)
-(*     (X = 2 -> Z := 3) *)
-(*   }> 300. *)
-(**)
-(* (* the size of the continuation to the left doesn't change, but the continuatoin is different*) *)
-(* (* Compute *) *)
-(* (*   run_interpreter (X !-> 5) <{ *) *)
-(* (*     (X:=1 !! X:=2); *) *)
-(* (*     ( *) *)
-(* (*       (X = 2 -> Z := 3); *) *)
-(* (*       (Y:=1 !! Y:=2); *) *)
-(* (*       (Y = 1 -> W := 3) *) *)
-(* (*     ) *) *)
-(* (*     ; *) *)
-(* (*     (Z := 4) *) *)
-(* (*   }> 300. *) *)
-(*   *)
-(* Compute *)
-(*   run_interpreter (X !-> 0) <{ *)
-(*     (X := 1 !! X := 2); *)
-(*     Y := X + 1; *)
-(*     X = 2 -> Z := 3 *)
-(*   }> 20. *)
-(**)
-(* Compute *)
-(*   run_interpreter (X !-> 0) <{ *)
-(*     if true then (X := 1 !! X := 2) else skip end; *)
-(*     Y := X + 1; *)
-(*     X = 2 -> Z := 3 *)
-(*   }> 20. *)
-(**)
-(* Compute *)
-(*   run_interpreter (X !-> 0) <{ *)
-(*     if true then *)
-(*       if true then (X := 1 !! X := 2) else skip end *)
-(*     else *)
-(*       skip *)
-(*     end; *)
-(*     Y := X + 1; *)
-(*     X = 2 -> Z := 3 *)
-(*   }> 10. *)
-(**)
-(* Compute *)
-(*   run_interpreter (X !-> 0) <{ *)
-(*   X := 1 !! X :=2; *)
-(*   Y := 1 !! Y :=2; *)
-(*   Z := 3; *)
-(*   Y=2 -> skip; *)
-(*   X=2 -> skip *)
-(* }> 20. *)
-(**)
-(* Compute *)
-(*   run_interpreter (X !-> 0) <{ *)
-(*   X := 1 !! X :=2; *)
-(*   W := 4; *)
-(*   Y := 1 !! Y :=2; *)
-(*   Z := 3; *)
-(*   Y=2 -> skip; *)
-(*   X=2 -> skip *)
-(* }> 20. *)
-(**)
-(* Unset Printing Notations. *)
-(* Definition a132 := (<{ *)
-(*     if true then (X := 1 !! X := 2) else skip end; *)
-(*     Y := X + 1; *)
-(*     X = 2 -> X := 3 *)
-(*   }>). *)
-(* Print a132. *)
-(* Set Printing Notations. *)
-(**)
-(* Example test_dsa_4: *)
-(*   run_interpreter (X !-> 5) <{ X:=7; X=10 -> X:=11 }> 10 = KO. *)
-(* Proof. auto. Qed. *)
-
 Example test_1: 
   run_interpreter (X !-> 5) <{skip}> 1 = OK [("X", 5); ("Y", 0); ("Z", 0)].
 Proof. auto. Qed.
@@ -221,6 +132,9 @@ Proof. auto. Qed.
   2.2. TODO: Prove p1_equals_p2. Recall that p1 and p2 are defined in Imp.v
 *)
 
+(* The interpreter result of p1 and p2 is the same, i.e, it returns for both cases Success (X !-> 2; st, cont), if and only if in the 
+non-deterministic operator (c1 !! c2) we first choose c1 *)
+
 Theorem p1_equals_p2: forall st cont,
   (exists i0,
     (forall i1, i1 >= i0 -> ceval_step st p1 cont i1 =  ceval_step st p2 cont i1)).
@@ -232,53 +146,9 @@ Qed.
 (**
   2.3. TODO: Prove ceval_step_more.
 *)
-(**)
-(* Lemma ceval_step_one_extra: forall i st st' c cont cont', *)
-(*   ceval_step st c cont i = Success (st', cont') -> *)
-(*   ceval_step st c cont (S i) = Success (st', cont'). *)
-(* Proof. *)
-(*   intros i. *)
-(*   destruct i. *)
-(*   - intros. simpl  in H. discriminate. *)
-(*   - intros. *)
-(*     generalize dependent st. *)
-(*     generalize dependent st'. *)
-(*     generalize dependent cont. *)
-(*     generalize dependent cont'. *)
-(*     induction c. *)
-(*     -- auto. *)
-(*     -- auto. *)
-(*     -- intros scont' scont sst' sst. intros H. *)
-(**)
-(**)
-(*   induction c. *)
-(*   (* skip *) *)
-(*   - destruct i. *)
-(*     -- simpl. intros H. discriminate. *)
-(*     -- auto.  *)
-(*   (* x := a *) *)
-(*   - destruct i. *)
-(*     -- simpl. intros H. discriminate. *)
-(*     -- auto.  *)
-(*   (* c1; c2 *) *)
-(*   - destruct i. *)
-(*     -- simpl. intros H. discriminate. *)
-(*     -- intros H. simpl. asser *)
-(*        ---   *)
-(**)
-(*   destruct i. *)
-(*   - simpl. intros H. discriminate. *)
-(*   - destruct c. *)
-(*     -- simpl. intros H. assumption. *)
-(*     -- simpl. intros H. assumption. *)
-(*     -- intros H.  *)
-(*    *)
 
-(*
-
-general idea: for each type of construct, check value of subconstruct and use
-i1's result for that
-*)
+(* For all i1 and i2 such that the interpreter result of ceval_step st c cont i1 is Success(st', cont) and i1 <= i2, then the interpreter result 
+of ceval_step st c cont i2 is also Success(st', cont). *)
 
 Theorem ceval_step_more: forall i1 i2 st st' c cont cont',
   i1 <= i2 ->

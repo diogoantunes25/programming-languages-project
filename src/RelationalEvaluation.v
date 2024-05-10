@@ -38,17 +38,13 @@ Inductive ceval : com -> state -> list (state * com) ->
 | E_Asgn: forall st q a n x,
     aeval st a = n -> 
     st / q =[ x := a ]=> (x !-> n; st) / q / Success
-| E_Seq_Suc: forall st st' st'' q q' q'' c1 c2,
+| E_Seq_Suc: forall st st' st'' q q' q'' c1 c2 r,
     st / q =[ c1 ]=> st' / q' / Success ->
-    st' / q' =[ c2 ]=> st'' / q'' / Success ->
-    st / q =[ c1;c2 ]=> st'' / q'' / Success
+    st' / q' =[ c2 ]=> st'' / q'' / r ->
+    st / q =[ c1;c2 ]=> st'' / q'' / r
 | E_Seq_Fail_1: forall st st' st'' q q' q'' c1 c2,
     st / q =[ c1 ]=> st' / q' / Fail ->
     st / q =[ c1;c2 ]=> st'' / q'' / Fail
-| E_Seq_Fail_2: forall st st' st'' st''' q q' q'' q''' c1 c2,
-    st / q =[ c1 ]=> st' / q' / Success ->
-    st' / q' =[ c2 ]=> st'' / q'' / Fail ->
-    st / q =[ c1;c2 ]=> st''' / q''' / Fail
 | E_If_True: forall st st' b q q' c1 c2 r,
     beval st b = true  ->
     st / q =[ c1 ]=> st' / q' / r ->
@@ -144,7 +140,7 @@ Proof.
        apply E_Asgn. trivial.
 Qed. 
 
-(* choose left *)
+(* choose left on the non-deterministic choice so the continuation will be empty in the end *)
 
 Example ceval_example_guard3: exists q,
 empty_st / [] =[
@@ -177,6 +173,8 @@ Proof.
                       unfold t_update.
                       destruct (eqb_string X x); trivial.
 Qed.
+
+(* Choose right on the Non-deterministic choice so the continuation at the end is not empty *)
 
 Example ceval_example_guard4: exists q,
 empty_st / [] =[
@@ -504,23 +502,6 @@ Proof.
           apply E_Choice_R with (q' := q'0).
           assumption.
 Qed.
-
-(* (c0 !! c4); (c2 !! c3) - choose c0 first *)
-(* (((c0 !! c4); c2) !! ((c0 !! c4); c3)) - choose c2 first *)
-
-(*
-c0 = X := 2
-c4 = X := 2
-c2 = X := 1; Y := 15
-c3 = X := 2; Y := 15
-
-(((c0 !! c4); c2) !! ((c0 !! c4); c3)); X = 2 -> skip (Y can end with 10)
-
-(c0 !! c4); (c2 !! c3); X = 2 -> skip (Y ends with 15)
-
-
-*)
-
 
 Lemma choice_seq_distr_l: forall c1 c2 c3,
 <{ c1 ; (c2 !! c3)}> == <{ (c1;c2) !! (c1;c3) }>.
