@@ -219,7 +219,7 @@ Proof.
   split.
   - reflexivity.
   - specialize (H st).
-    rewrite H in H3.
+    rewrite H3 in H.
     discriminate.
 Qed.
 
@@ -231,10 +231,10 @@ Proof.
   intros.
   inversion H0; subst.
   specialize (H) with (st := st) (r := RNormal st).
-  destruct H.
-  - apply E_AssertTrue. assumption.
+  destruct H; try apply E_AssertTrue; try exists x; assumption.
+  (*- apply E_AssertTrue. assumption.
   - assumption.
-  - exists x. assumption. 
+  - exists x. assumption. *)
 Qed.
 
 
@@ -377,14 +377,11 @@ Qed.
 Theorem hoare_assert: forall P (b: bexp),
   {{P /\ b}} <{ assert b }> {{P}}.
 Proof.
-  unfold hoare_triple.
-  intros.
-  inversion H; subst.
-  exists st.
-  split.
+  unfold hoare_triple; intros.
+  inversion H; subst. exists st. split.
   - reflexivity.
   - destruct H0. assumption.
-  - destruct H0. contradict H1. unfold bassn. rewrite H2. discriminate.
+  - destruct H0. inversion H1. rewrite H4 in H2. discriminate.
 Qed.
 
 (* ================================================================= *)
@@ -394,11 +391,8 @@ Qed.
 Theorem hoare_assume: forall (P:Assertion) (b:bexp),
   {{ P /\ b }} <{ assume b }> {{P}}.
 Proof.
-  unfold hoare_triple.
-  intros.
-  inversion H; subst.
-  exists st.
-  split.
+  unfold hoare_triple; intros.
+  inversion H; subst. exists st. split.
   - reflexivity.
   - apply H0.
 Qed.
@@ -413,8 +407,7 @@ Theorem hoare_choice' : forall P c1 c2 Q,
   {{P}} c2 {{Q}} ->
   {{P}} <{ c1 !! c2 }> {{Q}}.
 Proof.
-  unfold hoare_triple.
-  intros.
+  unfold hoare_triple; intros.
   inversion H1; subst; [apply H in H7 | apply H0 in H7]; assumption.
   (* unfold hoare_triple.
   intros.
@@ -437,8 +430,26 @@ Example hoare_choice_example:
   (* This example shows that for an initial state where X = 1, the program
   will terminate with X = 2 or X = 3. *)
 Proof.
+  unfold hoare_triple.
+  intros.
+  inversion H; subst; inversion H5; subst; simpl in *; rewrite H0 in H, H5.
+  - exists (X !-> 2; st). split; try rewrite H0; try left; reflexivity.
+  - exists (X !-> 3; st). split; try rewrite H0; try right; reflexivity.
+  (* 1st version - without simplification
+   unfold hoare_triple.
+  intros.
+  inversion H; subst.
+  - inversion H5; subst. simpl in *. rewrite H0 in H5. rewrite H0 in H.
+    exists (X !-> 2; st). split.
+    + rewrite H0. reflexivity.
+    + left. reflexivity.
+  - inversion H5; subst. simpl in *. rewrite H0 in H5. rewrite H0 in H.
+    exists (X !-> 3; st). split.
+    + rewrite H0. reflexivity.
+    + right. reflexivity.
+    *)
 Qed.
-
+    
 
 (* ################################################################# *)
 (* EXERCISE 4 (1.5 points): Define a relational evaluation (small-step *)
@@ -552,13 +563,13 @@ Proof.
   eexists. split.
   unfold prog1.
 
-  (* Assume *)
+  (* Sequence and assume (X = 1) *)
   eapply multi_step. apply CS_SeqStep. apply CS_AssumeStep. apply BS_Eq1. apply AS_Id.
   eapply multi_step. apply CS_SeqStep. apply CS_AssumeStep. apply BS_Eq. simpl.
   eapply multi_step. apply CS_SeqStep. apply CS_AssumeTrue.
   eapply multi_step. apply CS_SeqFinish.
 
-  (* Non-deterministic choice *)
+  (* Non-deterministic choice - (X := X + 1) !! (X := 3) *)
   eapply multi_step. apply CS_SeqStep. apply CS_NonDetChoiceLeft.
   eapply multi_step. apply CS_SeqStep. apply CS_AssStep. apply AS_Plus1. apply AS_Id.
   eapply multi_step. apply CS_SeqStep. apply CS_AssStep. apply AS_Plus. simpl.
