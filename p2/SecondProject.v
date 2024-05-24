@@ -430,8 +430,7 @@ Example hoare_choice_example:
   (* This example shows that for an initial state where X = 1, the program
   will terminate with X = 2 or X = 3. *)
 Proof.
-  unfold hoare_triple.
-  intros.
+  unfold hoare_triple; intros.
   inversion H; subst; inversion H5; subst; simpl in *; rewrite H0 in H, H5.
   - exists (X !-> 2; st). split; try rewrite H0; try left; reflexivity.
   - exists (X !-> 3; st). split; try rewrite H0; try right; reflexivity.
@@ -569,18 +568,21 @@ Proof.
   eapply multi_step. apply CS_SeqStep. apply CS_AssumeTrue.
   eapply multi_step. apply CS_SeqFinish.
 
-  (* Non-deterministic choice - (X := X + 1) !! (X := 3) *)
+  (* Sequence and Non-deterministic choice - 
+  (X := X + 1) !! (X := 3) - we choose left *)
   eapply multi_step. apply CS_SeqStep. apply CS_NonDetChoiceLeft.
   eapply multi_step. apply CS_SeqStep. apply CS_AssStep. apply AS_Plus1. apply AS_Id.
   eapply multi_step. apply CS_SeqStep. apply CS_AssStep. apply AS_Plus. simpl.
   eapply multi_step. apply CS_SeqStep. apply CS_Asgn.
   eapply multi_step. apply CS_SeqFinish.
 
-  (* Assert *)
+  (* assert (X = 2) *)
   eapply multi_step. apply CS_AssertStep. apply BS_Eq1. apply AS_Id.
   eapply multi_step. apply CS_AssertStep. apply BS_Eq. simpl.
   eapply multi_step. apply CS_AssertTrue.
-  eapply multi_refl. reflexivity.
+  eapply multi_refl. 
+  
+  reflexivity.
 Qed.
 
 
@@ -593,8 +595,7 @@ Lemma one_step_aeval_a: forall st a a',
   aeval st a = aeval st a'.
 Proof.
   intros.
-  induction H; try reflexivity.
-  all: unfold aeval; fold aeval; rewrite IHastep; reflexivity.
+  induction H; simpl; try reflexivity; rewrite IHastep; reflexivity.
 Qed.
 
 
@@ -705,8 +706,11 @@ Inductive dcom : Type :=
 | DCPost (d : dcom) (Q : Assertion)
   (* d ->> {{ Q }} *)
 | DCAssert (b : bexp) (Q : Assertion)
+  (* assert b {{ Q }} *)
 | DCAssume (b : bexp ) (Q : Assertion)
+  (* assume b {{ Q }} *)
 | DCNonDetChoice (d1 d2 : dcom).
+  (* d1 !! d2 *) 
 
 (** To provide the initial precondition that goes at the very top of a
     decorated program, we introduce a new type [decorated]: *)
@@ -1259,28 +1263,27 @@ Proof. verify. Qed.
     Hint: The loop invariant here must ensure that Z*Z is consistently
     less than or equal to X. *)
 
-(* TODO: fill in the assertions *)
 Definition sqrt_dec (m:nat) : decorated :=
   <{
-    {{ FILL_IN_HERE }} ->>
-    {{ FILL_IN_HERE }}
+    {{ X=m }} ->>
+    {{ X=m /\ 0*0 <= m }}
       Z := 0
-                    {{ FILL_IN_HERE }};
+                    {{ X=m /\ Z*Z <= m }};
       while ((Z+1)*(Z+1) <= X) do
-                    {{ FILL_IN_HERE  }} ->>
-                    {{ FILL_IN_HERE }}
+                    {{ X=m /\ Z*Z<=m /\ (Z+1)*(Z+1)<=X  }} ->>
+                    {{ X=m /\ (Z+1)*(Z+1)<=m }}
         Z := Z + 1
-                    {{ FILL_IN_HERE }}
+                    {{ X=m /\ Z*Z<=m }}
       end
-    {{ FILL_IN_HERE }} ->>
-    {{ FILL_IN_HERE }}
+    {{ X=m /\ Z*Z<=m /\ ~((Z+1)*(Z+1)<=X) }} ->>
+    {{ Z*Z<=m /\ m<(Z+1)*(Z+1) }}
   }>.
 
 Theorem sqrt_correct : forall m,
   outer_triple_valid (sqrt_dec m).
-Proof. (* TODO *) Admitted.
-
-
+Proof.
+  verify.
+Qed.
 
 (* ################################################################# *)
 (* EXERCISE 12 (3 points):  Consider the following triple:        
