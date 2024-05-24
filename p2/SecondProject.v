@@ -163,8 +163,21 @@ Inductive ceval : com -> state -> result -> Prop :=
       beval st b = true ->
       st =[ c ]=> RError ->
       st =[ while b do c end ]=> RError
-  (* TODO *)
-
+  | E_NonDetChoiceLeft : forall st c1 c2 r,
+    st =[ c1 ]=> r ->
+    st =[ c1 !! c2 ]=> r
+  | E_NonDetChoiceRight : forall st c1 c2 r,
+    st =[ c2 ]=> r ->
+    st =[ c1 !! c2 ]=> r
+  | E_AssumeTrue : forall st b,
+      beval st b = true ->
+      st =[ assume b ]=> RNormal st
+  | E_AssertTrue : forall st b,
+      beval st b = true ->
+      st =[ assert b ]=> RNormal st
+  | E_AssertFalse : forall st b,
+      beval st b = false ->
+      st =[ assert b ]=> RError
 where "st '=[' c ']=>' r" := (ceval c st r).
 
 
@@ -199,14 +212,29 @@ Theorem assume_false: forall P Q b,
        (forall st, beval st b = false) ->
        ({{P}} assume b {{Q}}).
 Proof.
-  (* TODO *)
+  unfold hoare_triple.
+  intros.
+  inversion H0; subst.
+  exists st.
+  split.
+  - reflexivity.
+  - specialize (H st).
+    rewrite H in H3.
+    discriminate.
 Qed.
 
 Theorem assert_implies_assume : forall P b Q,
      ({{P}} assert b {{Q}})
   -> ({{P}} assume b {{Q}}).
 Proof.
-  (* TODO *)
+  unfold hoare_triple.
+  intros.
+  inversion H0; subst.
+  specialize (H) with (st := st) (r := RNormal st).
+  destruct H.
+  - apply E_AssertTrue. assumption.
+  - assumption.
+  - exists x. assumption. 
 Qed.
 
 
@@ -347,9 +375,16 @@ Qed.
 (* ================================================================= *)
 
 Theorem hoare_assert: forall P (b: bexp),
-  (*TODO: Hoare proof rule for [assert b] *)
+  {{P /\ b}} <{ assert b }> {{P}}.
 Proof.
-  (* TODO *)
+  unfold hoare_triple.
+  intros.
+  inversion H; subst.
+  exists st.
+  split.
+  - reflexivity.
+  - destruct H0. assumption.
+  - destruct H0. contradict H1. unfold bassn. rewrite H2. discriminate.
 Qed.
 
 (* ================================================================= *)
@@ -357,9 +392,15 @@ Qed.
 (* ================================================================= *)
 
 Theorem hoare_assume: forall (P:Assertion) (b:bexp),
-  (*TODO: Hoare proof rule for [assume b] *)
+  {{ P /\ b }} <{ assume b }> {{P}}.
 Proof.
-  (* TODO *)
+  unfold hoare_triple.
+  intros.
+  inversion H; subst.
+  exists st.
+  split.
+  - reflexivity.
+  - apply H0.
 Qed.
 
 
@@ -368,9 +409,18 @@ Qed.
 (* ================================================================= *)
 
 Theorem hoare_choice' : forall P c1 c2 Q,
-  (*TODO: Hoare proof rule for [c1 !! c2] *)
+  {{P}} c1 {{Q}} ->
+  {{P}} c2 {{Q}} ->
+  {{P}} <{ c1 !! c2 }> {{Q}}.
 Proof.
-  (* TODO *)
+  unfold hoare_triple.
+  intros.
+  inversion H1; subst; [apply H in H7 | apply H0 in H7]; assumption.
+  (* unfold hoare_triple.
+  intros.
+  inversion H1; subst.
+  - apply H in H7. assumption. assumption.
+  - apply H0 in H7. assumption. assumption.*)
 Qed.
 
 
@@ -384,8 +434,9 @@ Example hoare_choice_example:
   {{ X = 1 }}
   X := X + 1 !! X := X + 2
   {{ X = 2 \/ X = 3 }}.
+  (* This example shows that for an initial state where X = 1, the program
+  will terminate with X = 2 or X = 3. *)
 Proof.
-  ( * TODO *)
 Qed.
 
 
@@ -422,10 +473,23 @@ Inductive cstep : (com * result)  -> (com * result) -> Prop :=
   | CS_While : forall st b c1,
           <{while b do c1 end}> / st 
       --> <{ if b then (c1; while b do c1 end) else skip end }> / st
-
-  (* TODO *)
-  
-
+  (* New part *)
+  | CS_AssertStep : forall st b b',
+      b / st -->b b' ->
+      <{ assert b }> / RNormal st --> <{ assert b' }> / RNormal st
+  | CS_AssertTrue : forall st,
+      <{ assert true }> / RNormal st --> <{ skip }> / RNormal st
+  | CS_AssertFalse : forall st,
+      <{ assert false }> / RNormal st --> <{ skip }> / RError
+  | CS_AssumeStep : forall st b b',
+      b / st -->b b' ->
+      <{ assume b }> / RNormal st --> <{ assume b' }> / RNormal st
+  | CS_AssumeTrue : forall st,
+      <{ assume true }> / RNormal st --> <{ skip }> / RNormal st
+  | CS_NonDetChoiceLeft : forall st c1 c2,
+      <{ c1 !! c2 }> / st --> c1 / st
+  | CS_NonDetChoiceRight : forall st c1 c2,
+      <{ c1 !! c2 }> / st --> c2 / st
   where " t '/' st '-->' t' '/' st' " := (cstep (t,st) (t',st')).
 
 Definition cmultistep := multi cstep.
@@ -485,7 +549,27 @@ Example prog1_example1:
        prog1 / RNormal (X !-> 1) -->* <{ skip }> / RNormal st'
     /\ st' X = 2.
 Proof.
-  (* TODO *)
+  eexists. split.
+  unfold prog1.
+
+  (* Assume *)
+  eapply multi_step. apply CS_SeqStep. apply CS_AssumeStep. apply BS_Eq1. apply AS_Id.
+  eapply multi_step. apply CS_SeqStep. apply CS_AssumeStep. apply BS_Eq. simpl.
+  eapply multi_step. apply CS_SeqStep. apply CS_AssumeTrue.
+  eapply multi_step. apply CS_SeqFinish.
+
+  (* Non-deterministic choice *)
+  eapply multi_step. apply CS_SeqStep. apply CS_NonDetChoiceLeft.
+  eapply multi_step. apply CS_SeqStep. apply CS_AssStep. apply AS_Plus1. apply AS_Id.
+  eapply multi_step. apply CS_SeqStep. apply CS_AssStep. apply AS_Plus. simpl.
+  eapply multi_step. apply CS_SeqStep. apply CS_Asgn.
+  eapply multi_step. apply CS_SeqFinish.
+
+  (* Assert *)
+  eapply multi_step. apply CS_AssertStep. apply BS_Eq1. apply AS_Id.
+  eapply multi_step. apply CS_AssertStep. apply BS_Eq. simpl.
+  eapply multi_step. apply CS_AssertTrue.
+  eapply multi_refl. reflexivity.
 Qed.
 
 
@@ -497,7 +581,9 @@ Lemma one_step_aeval_a: forall st a a',
   a / st -->a a' ->
   aeval st a = aeval st a'.
 Proof.
-  (* TODO (Hint: you can prove this by induction on a) *)
+  intros.
+  induction H; try reflexivity.
+  all: unfold aeval; fold aeval; rewrite IHastep; reflexivity.
 Qed.
 
 
@@ -607,9 +693,9 @@ Inductive dcom : Type :=
   (* ->> {{ P }} d *)
 | DCPost (d : dcom) (Q : Assertion)
   (* d ->> {{ Q }} *)
-| DCAssert (* TODO *) 
-| DCAssume (* TODO *)
-| DCNonDetChoice (* TODO *)
+| DCAssert (b : bexp) (Q : Assertion)
+| DCAssume (b : bexp ) (Q : Assertion)
+| DCNonDetChoice (d1 d2 : dcom).
 
 (** To provide the initial precondition that goes at the very top of a
     decorated program, we introduce a new type [decorated]: *)
@@ -650,9 +736,15 @@ Notation " d ; d' "
 Notation "{{ P }} d"
       := (Decorated P d)
       (in custom com at level 91, P constr) : dcom_scope.
-
-
-(* TODO: notation for the three new constructs *)
+Notation "'assert' b {{ Q }}"
+      := (DCAssert b Q)
+      (in custom com at level 89, b custom com at level 99, Q constr) : dcom_scope.
+Notation "'assume' b {{ Q }}"
+      := (DCAssume b Q)
+      (in custom com at level 89, b custom com at level 99, Q constr) : dcom_scope.
+Notation "d1 '!!' d2"
+      := (DCNonDetChoice d1 d2)
+      (in custom com at level 90, right associativity) : dcom_scope.
 
 Local Open Scope dcom_scope.
 
@@ -689,7 +781,9 @@ Fixpoint extract (d : dcom) : com :=
   | DCWhile b _ d _    => CWhile b (extract d)
   | DCPre _ d          => extract d
   | DCPost d _         => extract d
-  (* TODO *)
+  | DCAssert b _       => CAssert b
+  | DCAssume b _       => CAssume b
+  | DCNonDetChoice d1 d2 => CNonDetChoice (extract d1) (extract d2)
   end.
 
 Definition extract_dec (dec : decorated) : com :=
@@ -722,7 +816,9 @@ Fixpoint post (d : dcom) : Assertion :=
   | DCWhile _ _ _ Q         => Q
   | DCPre _ d               => post d
   | DCPost _ Q              => Q
-  (* TODO *)
+  | DCAssert _ Q            => Q
+  | DCAssume _ Q            => Q
+  | DCNonDetChoice d1 d2    => post d1 \/ post d2
   end.
 
 Definition post_dec (dec : decorated) : Assertion :=
@@ -890,7 +986,13 @@ Fixpoint verification_conditions (P : Assertion) (d : dcom) : Prop :=
   | DCPost d Q =>
       verification_conditions P d
       /\ (post d ->> Q)
-  (* TODO *)
+  | DCAssert b Q =>
+      (P ->> (Q /\ b))%assertion
+  | DCAssume b Q =>
+      (P ->> (Q /\ b))%assertion
+  | DCNonDetChoice d1 d2 =>
+      verification_conditions P d1
+      /\ verification_conditions P d2
   end.
 
 (** The key theorem states that [verification_conditions] does its job
@@ -937,7 +1039,13 @@ Proof.
   - (* Post *)
     destruct H as [Hd HQ].
     eapply hoare_consequence_post; eauto.
-  (* TODO *)
+  - (* Assert *)
+    eapply hoare_consequence_pre; eauto. apply hoare_assert.
+  - (* Assume *)
+    eapply hoare_consequence_pre; eauto. apply hoare_assume.
+  - (* NonDetChoice *)
+    destruct H as [H1 H2].
+    apply hoare_choice'; eapply hoare_consequence_post; eauto.
 Qed.
 
 
