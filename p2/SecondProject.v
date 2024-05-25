@@ -1348,21 +1348,59 @@ Definition parity_dec_nondet (m:nat) : decorated :=
 should not be changed. Note that the code below does
 not typecheck until you decorate it correctly. *)
 <{
-  {{ X = m }}
+  {{ X = m }} ->>
+  {{ X = m /\ ap parity X = parity m }}
     while 2 <= X do
+    {{ ap parity X = parity m /\ 2 <= X }} ->>
+    {{ ap parity (X - 2) = parity m /\ ap parity (X + 2) = parity m }}
       X := X - 2
+    {{ ap parity X = parity m }}
       !! 
       X := X + 2
+    {{ ap parity X = parity m }}
     end
+  {{ ap parity X = parity m /\ ~ 2 <= X }} ->>
   {{ X = parity m }} }>.
 
 
 Theorem parity_outer_triple_valid_nondet : forall m,
   outer_triple_valid (parity_dec_nondet m).
 Proof. 
-  (* TODO *)
-Qed.
-
+  verify; destruct (st X); try rewrite <- H; try destruct n; 
+  try reflexivity; try lia.
+  - apply parity_ge_2. try trivial.
+  - apply parity_plus_2.
+  - apply parity_plus_2.
+  (* before simplification: 
+  verify.
+  - destruct (st X).
+    + lia.
+    + destruct n; lia.
+  - destruct (st X).
+    + lia.
+    + destruct n; lia.
+  - destruct (st X).
+    + lia.
+    + destruct n.
+      * lia.
+      * rewrite <- H. apply parity_ge_2. assumption.
+  - destruct (st X).
+    + lia.
+    + destruct n.
+      * lia.
+      * rewrite <- H. apply parity_plus_2.
+  - destruct (st X).
+    + lia.
+    + destruct n.
+      * lia.
+      * rewrite <- H. apply parity_plus_2.
+  - destruct (st X).
+    + apply H.
+    + destruct n.
+      * apply H.
+      * rewrite <- H. lia.
+  *)
+Qed. 
 
 End DCom.
 
