@@ -389,12 +389,12 @@ Qed.
 (* ================================================================= *)
 
 Theorem hoare_assume: forall (P:Assertion) (b:bexp),
-  {{ P /\ b }} <{ assume b }> {{P}}.
+  {{ b -> P }} <{ assume b }> {{P}}.
 Proof.
   unfold hoare_triple; intros.
   inversion H; subst. exists st. split.
   - reflexivity.
-  - apply H0.
+  - apply H0. assumption.
 Qed.
 
 
@@ -1004,7 +1004,7 @@ Fixpoint verification_conditions (P : Assertion) (d : dcom) : Prop :=
   | DCAssert b Q =>
       (P ->> (Q /\ b))%assertion
   | DCAssume b Q =>
-      (P ->> (Q /\ b))%assertion
+      (P ->> (b -> Q))%assertion
   | DCNonDetChoice d1 d2 =>
       verification_conditions P d1
       /\ verification_conditions P d2
@@ -1057,7 +1057,7 @@ Proof.
   - (* Assert *)
     eapply hoare_consequence_pre; eauto. apply hoare_assert.
   - (* Assume *)
-    eapply hoare_consequence_pre; eauto. apply hoare_assume.
+    eapply hoare_consequence_pre; eauto. eapply hoare_assume.
   - (* NonDetChoice *)
     destruct H as [H1 H2].
     apply hoare_choice'; eapply hoare_consequence_post; eauto.
