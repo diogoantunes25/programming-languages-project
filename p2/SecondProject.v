@@ -375,7 +375,7 @@ Qed.
 (* ================================================================= *)
 
 Theorem hoare_assert: forall P (b: bexp),
-  {{P /\ b}} <{ assert b }> {{P /\ b}}.
+  {{P /\ b}} assert b {{P /\ b}}.
 Proof.
   unfold hoare_triple; intros.
   inversion H; subst. exists st. split.
@@ -389,7 +389,7 @@ Qed.
 (* ================================================================= *)
 
 Theorem hoare_assume: forall (P:Assertion) (b:bexp),
-  {{b -> P}} <{ assume b }> {{P}}.
+  {{b -> P}} assume b {{P}}.
 Proof.
   unfold hoare_triple; intros.
   inversion H; subst. exists st. split.
@@ -405,7 +405,7 @@ Qed.
 Theorem hoare_choice' : forall P c1 c2 Q,
   {{P}} c1 {{Q}} ->
   {{P}} c2 {{Q}} ->
-  {{P}} <{ c1 !! c2 }> {{Q}}.
+  {{P}} c1 !! c2 {{Q}}.
 Proof.
   unfold hoare_triple; intros.
   inversion H1; subst; [apply H in H7 | apply H0 in H7]; assumption.
