@@ -229,6 +229,11 @@ Proof.
   specialize (H) with (st := st) (r := RNormal st).
   destruct H; try apply E_AssertTrue; try exists x; assumption.
   (*
+  1st version (more detailed):
+  unfold hoare_triple; intros.
+  inversion H0; subst.
+  specialize (H) with (st := st) (r := RNormal st).
+  destruct H.
   - apply E_AssertTrue. assumption.
   - assumption.
   - exists x. assumption. 
@@ -387,12 +392,11 @@ Qed.
 (* ================================================================= *)
 
 Theorem hoare_assume: forall (P:Assertion) (b:bexp),
-  {{b -> P}} assume b {{P}}.
+  {{P}} assume b {{P /\ b}}.
 Proof.
-  unfold hoare_triple; intros.
-  inversion H; subst. exists st. split.
-  - reflexivity.
-  - apply H0. assumption.
+  intros. unfold hoare_triple. intros.
+  eexists. inversion H. subst.
+  split; eauto; split; trivial.
 Qed.
 
 
@@ -408,6 +412,7 @@ Proof.
   unfold hoare_triple; intros.
   inversion H1; subst; [apply H in H7 | apply H0 in H7]; assumption.
   (* 
+  1st version (without simplification):
   unfold hoare_triple.
   intros.
   inversion H1; subst.
@@ -434,7 +439,8 @@ Proof.
   inversion H; subst; inversion H5; subst; simpl in *; rewrite H0 in H, H5.
   - exists (X !-> 2; st). split; try rewrite H0; try left; reflexivity.
   - exists (X !-> 3; st). split; try rewrite H0; try right; reflexivity.
-  (* 1st version (without simplification):
+  (* 
+  1st version (without simplification):
   unfold hoare_triple.
   intros.
   inversion H; subst.
@@ -832,7 +838,7 @@ Fixpoint post (d : dcom) : Assertion :=
   | DCPre _ d               => post d
   | DCPost _ Q              => Q
   | DCAssert b Q            => Q /\ b
-  | DCAssume _ Q            => Q
+  | DCAssume b Q            => Q /\ b
   | DCNonDetChoice d1 d2    => post d1 \/ post d2
   end.
 
@@ -1004,7 +1010,7 @@ Fixpoint verification_conditions (P : Assertion) (d : dcom) : Prop :=
   | DCAssert b Q =>
       (P ->> (Q /\ b))%assertion
   | DCAssume b Q =>
-      (P ->> (b -> Q))%assertion
+      (P ->> (Q))%assertion
   | DCNonDetChoice d1 d2 =>
       verification_conditions P d1
       /\ verification_conditions P d2
@@ -1371,7 +1377,8 @@ Proof.
   - apply parity_ge_2. try trivial.
   - apply parity_plus_2.
   - apply parity_plus_2.
-  (* before simplification: 
+  (* 
+  1st version (before simplification): 
   verify.
   - destruct (st X).
     + lia.
