@@ -212,11 +212,8 @@ Theorem assume_false: forall P Q b,
        (forall st, beval st b = false) ->
        ({{P}} assume b {{Q}}).
 Proof.
-  unfold hoare_triple.
-  intros.
-  inversion H0; subst.
-  exists st.
-  split.
+  unfold hoare_triple; intros.
+  inversion H0; subst; exists st; split.
   - reflexivity.
   - specialize (H st).
     rewrite H3 in H.
@@ -227,14 +224,15 @@ Theorem assert_implies_assume : forall P b Q,
      ({{P}} assert b {{Q}})
   -> ({{P}} assume b {{Q}}).
 Proof.
-  unfold hoare_triple.
-  intros.
+  unfold hoare_triple; intros.
   inversion H0; subst.
   specialize (H) with (st := st) (r := RNormal st).
   destruct H; try apply E_AssertTrue; try exists x; assumption.
-  (*- apply E_AssertTrue. assumption.
+  (*
+  - apply E_AssertTrue. assumption.
   - assumption.
-  - exists x. assumption. *)
+  - exists x. assumption. 
+  *)
 Qed.
 
 
@@ -409,11 +407,13 @@ Theorem hoare_choice' : forall P c1 c2 Q,
 Proof.
   unfold hoare_triple; intros.
   inversion H1; subst; [apply H in H7 | apply H0 in H7]; assumption.
-  (* unfold hoare_triple.
+  (* 
+  unfold hoare_triple.
   intros.
   inversion H1; subst.
   - apply H in H7. assumption. assumption.
-  - apply H0 in H7. assumption. assumption.*)
+  - apply H0 in H7. assumption. assumption.
+  *)
 Qed.
 
 
@@ -434,8 +434,8 @@ Proof.
   inversion H; subst; inversion H5; subst; simpl in *; rewrite H0 in H, H5.
   - exists (X !-> 2; st). split; try rewrite H0; try left; reflexivity.
   - exists (X !-> 3; st). split; try rewrite H0; try right; reflexivity.
-  (* 1st version - without simplification
-   unfold hoare_triple.
+  (* 1st version (without simplification):
+  unfold hoare_triple.
   intros.
   inversion H; subst.
   - inversion H5; subst. simpl in *. rewrite H0 in H5. rewrite H0 in H.
